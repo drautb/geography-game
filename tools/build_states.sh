@@ -9,13 +9,13 @@
 #      lower 48, with Alaska scaled/inset and Hawaii repositioned (classic classroom layout)
 #   5. Rename fields to a compact schema and export GeoJSON
 #
-# Output: data/build/us_states.geojson (lat/lon replaced by projected planar coords in meters)
+# Output: data/assets/us_states.geojson (lat/lon replaced by projected planar coords in meters)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 RAW="data/raw/cb_2024_us_state_20m.shp"
-OUT="data/build/us_states.geojson"
+OUT="data/assets/us_states.geojson"
 
 # FIPS codes for the five territories we exclude (keep 50 states + DC = 51 features).
 # 60=AS, 66=GU, 69=MP, 72=PR, 78=VI

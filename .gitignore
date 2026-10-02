@@ -27,8 +27,3 @@ browser_screenshot.png
 browser_screenshot.png.import
 browser_click.png
 browser_click.png.import
-
-# A global ~/.gitignore has a "build" pattern that would drop generated map data.
-# These GeoJSONs are small, deterministic, and loaded by the game — keep them tracked.
-!data/build/
-!data/build/*.geojson

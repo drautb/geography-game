@@ -8,7 +8,7 @@ extends Node2D
 const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const GameManagerScript := preload("res://scripts/game_manager.gd")
 const GameUiScript := preload("res://scripts/game_ui.gd")
-const STATES_GEOJSON := "res://data/build/us_states.geojson"
+const STATES_GEOJSON := "res://data/assets/us_states.geojson"
 const DESIGN_SIZE := Vector2(1280, 720)
 
 var _map_root: Node2D

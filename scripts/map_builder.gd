@@ -2,7 +2,7 @@ extends RefCounted
 class_name MapBuilder
 ## Builds the interactive US map node tree from a projected GeoJSON file.
 ##
-## The GeoJSON (data/build/us_states.geojson) holds albersusa-projected planar
+## The GeoJSON (data/assets/us_states.geojson) holds albersusa-projected planar
 ## coordinates in meters, Y-up. We fit them to a target pixel rectangle with a
 ## uniform scale and a Y-flip (Godot is Y-down), preserving aspect ratio.
 ##
