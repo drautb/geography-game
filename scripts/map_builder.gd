@@ -44,7 +44,7 @@ static func region_color(region: String, enabled := true) -> Color:
 ## whole state (including multipolygon parts) by its postal code.
 const FILL_GROUP_PREFIX := "fill_"
 
-## Small, tightly-packed states labeled by postal code (full names overlap badly).
+## Small, tightly-packed states labeled by leader-line callout (names overlap badly).
 const SMALL_STATES := {
     "CT": true,
     "DE": true,
@@ -55,6 +55,10 @@ const SMALL_STATES := {
     "RI": true,
     "VT": true,
 }
+
+## Of the small states, these are called out ABOVE the map (northern New England)
+## rather than in the right-hand column.
+const TOP_CALLOUT_STATES := {"VT": true, "NH": true}
 
 
 ## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
@@ -158,7 +162,7 @@ static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
     var container := Node2D.new()
     container.name = "StateNameLabels"
 
-    var small: Array = []  # [{name, anchor}] for callout states
+    var small: Array = []  # [{code, name, anchor}] for callout states
     for child in state_areas.get_children():
         if not (child is Area2D) or not child.has_meta("label_pos"):
             continue
@@ -166,7 +170,7 @@ static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
         var name_str := String(child.get_meta("state_name"))
         var pos: Vector2 = child.get_meta("label_pos")
         if SMALL_STATES.has(code):
-            small.append({"name": name_str, "anchor": pos})
+            small.append({"code": code, "name": name_str, "anchor": pos})
         else:
             container.add_child(_make_name_label(name_str, pos))
 
@@ -175,31 +179,56 @@ static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
     return container
 
 
-## Lay the small-state full-name labels in a staggered column off the east coast,
-## each joined to its state by a thin leader line.
+## Lay small-state full-name labels as leader-line callouts. Northern New England
+## (VT, NH) is called out ABOVE the states (lines go up); the remaining coastal
+## states fan out in a staggered column to the right. Splitting the group this way
+## keeps the right column short and avoids long crossing diagonals.
 static func _build_name_callouts(container: Node2D, small: Array) -> void:
     if small.is_empty():
         return
-    # North-to-south by screen y so the callout column mirrors the states' order.
-    small.sort_custom(func(a, b): return a["anchor"].y < b["anchor"].y)
+    var top_group: Array = []
+    var right_group: Array = []
+    for entry in small:
+        if TOP_CALLOUT_STATES.has(String(entry["code"])):
+            top_group.append(entry)
+        else:
+            right_group.append(entry)
+
+    # Top group: labels above the map, west-to-east, lines going up.
+    top_group.sort_custom(func(a, b): return a["anchor"].x < b["anchor"].x)
+    var top_y := 70.0
+    var top_x := 980.0
+    var top_step := 150.0
+    for i in top_group.size():
+        var entry: Dictionary = top_group[i]
+        _draw_callout(
+            container, entry["anchor"], Vector2(top_x + top_step * i, top_y), entry["name"]
+        )
+
+    # Right group: staggered column off the east coast, north-to-south.
+    right_group.sort_custom(func(a, b): return a["anchor"].y < b["anchor"].y)
     var callout_x := 1150.0
-    var top := 136.0
-    var step := 25.0
-    for i in small.size():
-        var entry: Dictionary = small[i]
-        var anchor: Vector2 = entry["anchor"]
-        var label_pos := Vector2(callout_x, top + step * i)
-        # Leader line from the state anchor to the left edge of the label.
-        var line := Line2D.new()
-        line.points = PackedVector2Array([anchor, label_pos + Vector2(-4, 8)])
-        line.width = 1.0
-        line.default_color = Color(0.7, 0.75, 0.82, 0.7)
-        line.antialiased = true
-        container.add_child(line)
-        var label := _make_name_label(String(entry["name"]), label_pos)
-        # Callout labels are left-aligned at callout_x (not centered on a point).
-        label.position = label_pos
-        container.add_child(label)
+    var top := 190.0
+    var step := 26.0
+    for i in right_group.size():
+        var entry: Dictionary = right_group[i]
+        _draw_callout(container, entry["anchor"], Vector2(callout_x, top + step * i), entry["name"])
+
+
+## Draw one leader-line callout: a thin line from the state anchor to the label,
+## plus the left-aligned full-name label at label_pos.
+static func _draw_callout(
+    container: Node2D, anchor: Vector2, label_pos: Vector2, name_str: String
+) -> void:
+    var line := Line2D.new()
+    line.points = PackedVector2Array([anchor, label_pos + Vector2(-4, 8)])
+    line.width = 1.0
+    line.default_color = Color(0.7, 0.75, 0.82, 0.7)
+    line.antialiased = true
+    container.add_child(line)
+    var label := _make_name_label(name_str, label_pos)
+    label.position = label_pos
+    container.add_child(label)
 
 
 ## A small outlined, centered state-name label for the persistent name layer.
