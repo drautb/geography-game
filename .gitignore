@@ -18,3 +18,6 @@ core.*
 
 # Large intermediate data (keep raw source + final build, drop scratch)
 data/raw/*.zip
+
+# Godot auto-generates .translation from CSVs; we keep CSVs as plain data (importer=keep)
+*.translation
