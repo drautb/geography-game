@@ -16,6 +16,8 @@ var _map_root: Node2D
 var _game
 var _ui: CanvasLayer
 var _name_by_code := {}
+var _region_by_code := {}
+var _enabled_regions := {}
 var _last_answer_code := ""
 var _wrong_code := ""
 var _pins: Node2D
@@ -36,6 +38,7 @@ func _ready() -> void:
     var states := MapBuilderScript.load_state_list(STATES_GEOJSON)
     for s in states:
         _name_by_code[String(s["code"])] = String(s["name"])
+        _region_by_code[String(s["code"])] = String(s["region"])
     var capitals := MapBuilderScript.load_capital_list(CAPITALS_GEOJSON)
     for c in capitals:
         _capital_by_code[String(c["code"])] = String(c["capital"])
@@ -63,6 +66,13 @@ func _ready() -> void:
     _game.start()
 
 
+## A state's base fill: its region color, dimmed if the region is disabled.
+func _base_fill(code: String) -> Color:
+    var region := String(_region_by_code.get(code, ""))
+    var on: bool = _enabled_regions.is_empty() or _enabled_regions.get(region, false)
+    return MapBuilderScript.region_color(region, on)
+
+
 ## Any left-click advances when the game is waiting (after a correct answer or
 ## game over). State clicks while playing are handled by the Area2D -> state_clicked
 ## path; this only acts on the "click anywhere to continue" states.
@@ -76,10 +86,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_round_advanced(code: String) -> void:
     # Reset the previous round's coloring and labels, then show the new prompt.
     if _last_answer_code != "":
-        MapBuilderScript.set_fill(self, _last_answer_code, MapBuilderScript.FILL_COLOR)
+        MapBuilderScript.set_fill(self, _last_answer_code, _base_fill(_last_answer_code))
         _last_answer_code = ""
     if _wrong_code != "":
-        MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
+        MapBuilderScript.set_fill(self, _wrong_code, _base_fill(_wrong_code))
         _wrong_code = ""
     _clear_labels()
     _ui.set_prompt_name(_game.prompt_label())
@@ -89,13 +99,13 @@ func _on_round_advanced(code: String) -> void:
 func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
     if correct:
         if _wrong_code != "" and _wrong_code != clicked_code:
-            MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
+            MapBuilderScript.set_fill(self, _wrong_code, _base_fill(_wrong_code))
         _wrong_code = ""
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_CORRECT)
         _last_answer_code = clicked_code
     else:
         if _wrong_code != "":
-            MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
+            MapBuilderScript.set_fill(self, _wrong_code, _base_fill(_wrong_code))
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_WRONG)
         _wrong_code = clicked_code
         _last_answer_code = clicked_code
@@ -157,21 +167,23 @@ func _clear_labels() -> void:
 func _on_mode_toggled(capital_mode: bool) -> void:
     _capital_mode = capital_mode
     _pins.visible = capital_mode
+    _enabled_regions = _ui.enabled_regions()
     _reset_all_fills()
     _game.set_mode(GameManagerScript.Mode.CAPITAL if capital_mode else GameManagerScript.Mode.STATE)
-    _game.set_regions(_ui.enabled_regions())
+    _game.set_regions(_enabled_regions)
     _game.start()
 
 
 func _on_regions_changed(enabled: Dictionary) -> void:
+    _enabled_regions = enabled
     _reset_all_fills()
     _game.set_regions(enabled)
     _game.start()
 
 
 func _reset_all_fills() -> void:
-    for code in _name_by_code.keys():
-        MapBuilderScript.set_fill(self, code, MapBuilderScript.FILL_COLOR)
+    # Repaint every state to its region base color, dimming disabled regions.
+    MapBuilderScript.apply_region_colors(_map_root, _enabled_regions)
     _last_answer_code = ""
     _wrong_code = ""
     _clear_labels()

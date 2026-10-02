@@ -21,6 +21,25 @@ const BORDER_WIDTH := 1.5
 const CAPITAL_COLOR := Color(0.98, 0.85, 0.4)
 const CAPITAL_RING := Color(0.2, 0.16, 0.1)
 
+## Base fill color per Census region.
+const REGION_COLORS := {
+    "Northeast": Color(0.42, 0.55, 0.72),
+    "Midwest": Color(0.46, 0.66, 0.56),
+    "South": Color(0.76, 0.62, 0.44),
+    "West": Color(0.66, 0.5, 0.66),
+}
+
+
+## The base fill for a region, dimmed (desaturated + darkened) when disabled.
+static func region_color(region: String, enabled := true) -> Color:
+    var c: Color = REGION_COLORS.get(region, FILL_COLOR)
+    if enabled:
+        return c
+    # Dim: pull toward the dark background and desaturate.
+    var dim := c.lerp(Color(0.16, 0.19, 0.24), 0.68)
+    return Color(dim.r, dim.g, dim.b, 1.0)
+
+
 ## Group name applied to every state's fill polygons, so set_fill() can recolor a
 ## whole state (including multipolygon parts) by its postal code.
 const FILL_GROUP_PREFIX := "fill_"
@@ -29,6 +48,18 @@ const FILL_GROUP_PREFIX := "fill_"
 ## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
 static func set_fill(root: Node, state_code: String, color: Color) -> void:
     root.get_tree().call_group(FILL_GROUP_PREFIX + state_code, "set_color", color)
+
+
+## Reset every state under `map_root` to its region base color, dimming states
+## whose region is not enabled. `enabled_regions` is a {region: true} set; an empty
+## set means all regions are enabled.
+static func apply_region_colors(map_root: Node, enabled_regions: Dictionary) -> void:
+    for child in map_root.get_children():
+        if not (child is Area2D) or not child.has_meta("region"):
+            continue
+        var region := String(child.get_meta("region"))
+        var on: bool = enabled_regions.is_empty() or enabled_regions.get(region, false)
+        set_fill(map_root, String(child.name), region_color(region, on))
 
 
 ## Read the list of {code, name} for every feature in a GeoJSON file.
@@ -249,13 +280,16 @@ static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Tran
 
 static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform) -> void:
     var code := String(props.get("code", "??"))
+    var region := String(props.get("region", ""))
     var area := Area2D.new()
     area.name = code
     area.set_meta("state_code", code)
     area.set_meta("state_name", props.get("name", ""))
+    area.set_meta("region", region)
     area.input_pickable = true
     area.input_event.connect(_on_area_input.bind(code))
 
+    var base_color := region_color(region, true)
     var best_anchor := Vector2.ZERO
     var best_area := -1.0
 
@@ -275,7 +309,7 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
             if ring_index == 0:
                 var fill := Polygon2D.new()
                 fill.polygon = points
-                fill.color = FILL_COLOR
+                fill.color = base_color
                 fill.add_to_group(FILL_GROUP_PREFIX + code)
                 area.add_child(fill)
 
