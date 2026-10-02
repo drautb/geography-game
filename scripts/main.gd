@@ -3,4 +3,4 @@ extends Node2D
 
 
 func _ready() -> void:
-	print("Geography Game — scaffold ready")
+    print("Geography Game — scaffold ready")
