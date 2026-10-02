@@ -16,6 +16,7 @@ var _game
 var _ui: CanvasLayer
 var _name_by_code := {}
 var _last_answer_code := ""
+var _wrong_code := ""
 
 
 func _ready() -> void:
@@ -51,22 +52,34 @@ func _on_game_over(_score: int, _total: int) -> void:
 
 
 func _on_round_advanced(code: String) -> void:
-    # Reset the previous answer's coloring and show the new prompt.
+    # Reset the previous round's coloring and show the new prompt.
     if _last_answer_code != "":
         MapBuilderScript.set_fill(self, _last_answer_code, MapBuilderScript.FILL_COLOR)
         _last_answer_code = ""
+    if _wrong_code != "":
+        MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
+        _wrong_code = ""
     _ui.set_prompt_name(_name_by_code.get(code, code))
     _ui.set_score(_game.score(), _game.total())
 
 
 func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
     if correct:
+        # Clear any lingering wrong-guess red from this round, then color the
+        # correct pick green.
+        if _wrong_code != "" and _wrong_code != clicked_code:
+            MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
+        _wrong_code = ""
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_CORRECT)
+        _last_answer_code = clicked_code
     else:
-        # Only mark the wrong click red — do NOT reveal the correct state, so the
-        # player still has to find it when it comes back around.
+        # Clear the previous wrong guess's red (player keeps guessing on this
+        # round), then redden the new one. Never reveal the correct state.
+        if _wrong_code != "":
+            MapBuilderScript.set_fill(self, _wrong_code, MapBuilderScript.FILL_COLOR)
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_WRONG)
-    _last_answer_code = clicked_code
+        _wrong_code = clicked_code
+        _last_answer_code = clicked_code
     _ui.set_score(_game.score(), _game.total())
 
 
@@ -83,3 +96,4 @@ func _reset_all_fills() -> void:
     for code in _name_by_code.keys():
         MapBuilderScript.set_fill(self, code, MapBuilderScript.FILL_COLOR)
     _last_answer_code = ""
+    _wrong_code = ""

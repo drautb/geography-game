@@ -88,11 +88,13 @@ func _on_answer_resolved(code: String, correct: bool) -> void:
     if correct:
         _feedback_label.text = "Correct!"
         _feedback_label.add_theme_color_override("font_color", Color(0.4, 0.85, 0.45))
+        _next_button.visible = true
     else:
+        # Wrong guess: name what they clicked and invite another try. The round
+        # stays open, so no Next button yet.
         var clicked_name: String = _name_by_code.get(code, code)
-        _feedback_label.text = "That's %s — try again next round" % clicked_name
+        _feedback_label.text = "That's %s — keep looking" % clicked_name
         _feedback_label.add_theme_color_override("font_color", Color(0.9, 0.5, 0.45))
-    _next_button.visible = true
 
 
 func _on_game_over(score: int, total: int) -> void:

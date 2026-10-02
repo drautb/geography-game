@@ -50,11 +50,21 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
     _frames += 1
     if _frames == 3:
-        # Simulate a WRONG click: pick any state that is not the prompt.
+        # First WRONG guess: round must stay open.
         var wrong := "TX" if _prompt_code != "TX" else "CA"
-        print("prompt is: %s, clicking wrong: %s" % [_prompt_code, wrong])
+        print("prompt=%s, wrong guess 1=%s" % [_prompt_code, wrong])
         EventBus.state_clicked.emit(wrong)
-    if _frames == 7:
+    if _frames == 5:
+        # Second WRONG guess: still open (proves keep-guessing works).
+        var wrong2 := "FL" if _prompt_code != "FL" else "NY"
+        print("prompt still=%s, wrong guess 2=%s" % [_game.current_prompt().get("code"), wrong2])
+        EventBus.state_clicked.emit(wrong2)
+    if _frames == 9:
+        # Finally the CORRECT state.
+        print("clicking correct=%s" % _prompt_code)
+        EventBus.state_clicked.emit(_prompt_code)
+        print("score=%d (0 expected: missed before solving)" % _game.score())
+    if _frames == 13:
         var image := get_viewport().get_texture().get_image()
         if image:
             image.save_png("/project/test_screenshot.png")

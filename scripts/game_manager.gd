@@ -2,9 +2,10 @@ extends RefCounted
 class_name GameManager
 ## "Find the state" game logic. Pure state + rules, no scene-tree coupling.
 ##
-## Owns a shuffled queue of prompt states. On each EventBus.state_clicked, resolves
-## the answer against the current prompt, updates the score, and advances. Communicates
-## outward only through EventBus signals so the UI and map stay decoupled.
+## Owns a shuffled queue of prompt states. The player keeps guessing until they
+## click the correct state; a round resolves only on a correct click. A point is
+## awarded only for a first-try solve. Communicates outward only through EventBus
+## signals so the UI and map stay decoupled.
 
 var _states: Array[Dictionary] = []
 var _queue: Array = []
@@ -12,6 +13,7 @@ var _index := -1
 var _score := 0
 var _total := 0
 var _answered := false
+var _missed_this_round := false
 var _solved := {}
 
 
@@ -53,14 +55,16 @@ func _on_state_clicked(state_code: String) -> void:
     var prompt: Dictionary = _queue[_index]
     var correct: bool = state_code == String(prompt["code"])
     if correct:
-        # Count each state only once, even if it was missed earlier and requeued.
-        if not _solved.has(String(prompt["code"])):
+        # Award a point only for a first-try solve (no wrong guesses this round),
+        # counted once per state. The player keeps guessing until correct, so an
+        # unconditional point would make every score a perfect score.
+        if not _missed_this_round and not _solved.has(String(prompt["code"])):
             _solved[String(prompt["code"])] = true
             _score += 1
+        _answered = true
     else:
-        # Requeue the missed state so it comes back later this run.
-        _queue.append(prompt)
-    _answered = true
+        # Wrong guess: give feedback but stay on this state — do NOT lock or advance.
+        _missed_this_round = true
     EventBus.answer_resolved.emit(state_code, correct)
 
 
@@ -72,6 +76,7 @@ func next() -> void:
 func _advance() -> void:
     _index += 1
     _answered = false
+    _missed_this_round = false
     if _index >= _queue.size():
         EventBus.game_over.emit(_score, _total)
         return
