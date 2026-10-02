@@ -46,6 +46,17 @@ const server = http.createServer((req, res) => {
 
   await page.screenshot({ path: "/project/browser_screenshot.png" });
 
+  // Interaction smoke test: click on the canvas (over the lower-48 landmass) to
+  // exercise the real Area2D input_event path. A clean run shows no new errors
+  // and the "Next" button becomes visible (an answer was resolved).
+  const canvas = await page.$("canvas");
+  if (canvas) {
+    const box = await canvas.boundingBox();
+    await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.45);
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: "/project/browser_click.png" });
+  }
+
   // Sample the canvas for non-background pixels to detect a blank screen.
   const stats = await page.evaluate(() => {
     const c = document.querySelector("canvas");

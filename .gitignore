@@ -25,3 +25,5 @@ data/raw/*.zip
 # Browser verification screenshot (ephemeral)
 browser_screenshot.png
 browser_screenshot.png.import
+browser_click.png
+browser_click.png.import

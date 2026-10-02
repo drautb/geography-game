@@ -13,8 +13,36 @@ class_name MapBuilder
 ##   └── CollisionPolygon2D (hit region, one per geometry part)
 
 const FILL_COLOR := Color(0.42, 0.55, 0.68)
+const FILL_CORRECT := Color(0.36, 0.72, 0.42)
+const FILL_WRONG := Color(0.82, 0.36, 0.33)
+const FILL_HIGHLIGHT := Color(0.95, 0.78, 0.35)
 const BORDER_COLOR := Color(0.12, 0.17, 0.24)
 const BORDER_WIDTH := 1.5
+
+## Group name applied to every state's fill polygons, so set_fill() can recolor a
+## whole state (including multipolygon parts) by its postal code.
+const FILL_GROUP_PREFIX := "fill_"
+
+
+## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
+static func set_fill(root: Node, state_code: String, color: Color) -> void:
+    root.get_tree().call_group(FILL_GROUP_PREFIX + state_code, "set_color", color)
+
+
+## Read the list of {code, name} for every feature in a GeoJSON file.
+static func load_state_list(geojson_path: String) -> Array:
+    var out: Array = []
+    var text := FileAccess.get_file_as_string(geojson_path)
+    if text.is_empty():
+        push_error("MapBuilder: could not read %s" % geojson_path)
+        return out
+    var data = JSON.parse_string(text)
+    if data == null or not data.has("features"):
+        return out
+    for feature in data["features"]:
+        var props: Dictionary = feature.get("properties", {})
+        out.append({"code": props.get("code", ""), "name": props.get("name", "")})
+    return out
 
 
 class Transform:
@@ -111,10 +139,13 @@ static func build(
 
 
 static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform) -> void:
+    var code := String(props.get("code", "??"))
     var area := Area2D.new()
-    area.name = String(props.get("code", "??"))
-    area.set_meta("state_code", props.get("code", ""))
+    area.name = code
+    area.set_meta("state_code", code)
     area.set_meta("state_name", props.get("name", ""))
+    area.input_pickable = true
+    area.input_event.connect(_on_area_input.bind(code))
 
     for part in _iter_parts(geom):
         # part = list of rings; ring 0 is the outer boundary, rest are holes.
@@ -133,6 +164,7 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
                 var fill := Polygon2D.new()
                 fill.polygon = points
                 fill.color = FILL_COLOR
+                fill.add_to_group(FILL_GROUP_PREFIX + code)
                 area.add_child(fill)
 
                 var col := CollisionPolygon2D.new()
@@ -151,3 +183,13 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
             area.add_child(line)
 
     parent.add_child(area)
+
+
+## Emit EventBus.state_clicked on a left-click release within a state's area.
+static func _on_area_input(
+    _viewport: Node, event: InputEvent, _shape_idx: int, code: String
+) -> void:
+    if event is InputEventMouseButton:
+        var mb := event as InputEventMouseButton
+        if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+            EventBus.state_clicked.emit(code)

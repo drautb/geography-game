@@ -105,6 +105,32 @@ curl -s -o /dev/null -w "%{http_code} %{content_type}\n" http://localhost:8099/i
 
 Expect HTTP 200 and `application/wasm`. Open `http://localhost:8099/` in a browser to play.
 
+### Browser verification (headless Chromium)
+
+A local HTTP 200 only proves the files are served — **not** that the WASM boots and the
+canvas paints. A desktop-renderer screenshot (the step above) also cannot catch web-only or
+export-only failures: for example, data files silently omitted from the `.pck` render blank
+in the browser while the desktop build looks fine. To actually verify the exported build,
+load it in headless Chromium via `tools/verify_web.js` (serves `export/`, loads the page,
+waits for the runtime to boot, screenshots the canvas, reports console errors):
+
+```bash
+docker run --rm -v "$(pwd)":/project -w /project \
+  -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+  mcr.microsoft.com/playwright:v1.48.0-jammy \
+  bash -c "cd /tmp && npm init -y >/dev/null 2>&1 && \
+    npm install playwright-core@1.48.0 >/dev/null 2>&1 && \
+    cd /project && NODE_PATH=/tmp/node_modules node tools/verify_web.js 2>&1; \
+    chown \$(id -u):\$(id -g) /project/browser_screenshot.png 2>/dev/null"
+```
+
+Then inspect `browser_screenshot.png`. A clean run prints `RESULT {"stats":{"canvas":true,...},"errors":[]}` and no `SCRIPT ERROR` / `could not read` lines in the console output.
+Pull the image once with `docker pull mcr.microsoft.com/playwright:v1.48.0-jammy`.
+
+**Any change to the export packaging (new data files, filters, assets) must be verified this
+way, not just by the desktop screenshot.** Non-resource data files (`.geojson`, `.csv`) are
+only packed when listed in the Web preset's `include_filter`.
+
 ## Formatting
 
 gdtoolkit's console script is not on PATH in this environment; invoke the module directly:
