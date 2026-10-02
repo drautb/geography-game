@@ -46,6 +46,10 @@ static func _compute_transform(features: Array, target_size: Vector2, padding: f
 
     var span_x := max_x - min_x
     var span_y := max_y - min_y
+    # Guard against a degenerate target (e.g. a web canvas reporting size 0 before
+    # layout). Fall back to a sane default so geometry is never drawn off-screen.
+    if target_size.x < 1.0 or target_size.y < 1.0:
+        target_size = Vector2(1280, 720)
     var avail := target_size - Vector2(padding, padding) * 2.0
     var scale := minf(avail.x / span_x, avail.y / span_y)
 

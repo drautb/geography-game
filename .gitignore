@@ -21,3 +21,7 @@ data/raw/*.zip
 
 # Godot auto-generates .translation from CSVs; we keep CSVs as plain data (importer=keep)
 *.translation
+
+# Browser verification screenshot (ephemeral)
+browser_screenshot.png
+browser_screenshot.png.import
