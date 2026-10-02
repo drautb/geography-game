@@ -43,7 +43,13 @@ static func load_state_list(geojson_path: String) -> Array:
         return out
     for feature in data["features"]:
         var props: Dictionary = feature.get("properties", {})
-        out.append({"code": props.get("code", ""), "name": props.get("name", "")})
+        out.append(
+            {
+                "code": props.get("code", ""),
+                "name": props.get("name", ""),
+                "region": props.get("region", "")
+            }
+        )
     return out
 
 

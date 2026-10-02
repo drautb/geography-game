@@ -32,4 +32,7 @@ npx -y mapshaper@latest "$RAW" \
 # Enlarge DC and move it to an ocean callout (keeps it a clickable quiz target).
 python3 "$(dirname "$0")/inset_dc.py"
 
+# Tag each state with its Census region (for the region-focus checkboxes).
+python3 "$(dirname "$0")/add_regions.py"
+
 echo "wrote $OUT"

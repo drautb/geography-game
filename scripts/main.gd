@@ -54,6 +54,7 @@ func _ready() -> void:
     add_child(_ui)
     _ui.set_name_lookup(_name_by_code)
     _ui.mode_toggled.connect(_on_mode_toggled)
+    _ui.regions_changed.connect(_on_regions_changed)
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
@@ -158,6 +159,13 @@ func _on_mode_toggled(capital_mode: bool) -> void:
     _pins.visible = capital_mode
     _reset_all_fills()
     _game.set_mode(GameManagerScript.Mode.CAPITAL if capital_mode else GameManagerScript.Mode.STATE)
+    _game.set_regions(_ui.enabled_regions())
+    _game.start()
+
+
+func _on_regions_changed(enabled: Dictionary) -> void:
+    _reset_all_fills()
+    _game.set_regions(enabled)
     _game.start()
 
 

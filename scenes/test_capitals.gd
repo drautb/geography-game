@@ -26,7 +26,6 @@ func _ready() -> void:
     _ui = GameUiScript.new()
     add_child(_ui)
     _ui.set_name_lookup({})
-    _ui.set_capital_mode(true)
     EventBus.round_advanced.connect(func(_c): _ui.set_prompt_name(_game.prompt_label()))
 
     _game = GameManagerScript.new(states, capitals)

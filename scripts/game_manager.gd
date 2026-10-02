@@ -14,6 +14,8 @@ enum Mode { STATE, CAPITAL }
 
 var _states: Array[Dictionary] = []
 var _capitals: Array[Dictionary] = []
+var _region_by_code := {}
+var _enabled_regions := {}  # region name -> true; empty means "all"
 var _mode: int = Mode.STATE
 var _queue: Array = []
 var _index := -1
@@ -25,10 +27,12 @@ var _missed_this_round := false
 var _solved := {}
 
 
-## states: [{code, name}]; capitals: [{code, name, capital}] (may be fewer entries).
+## states: [{code, name, region}]; capitals: [{code, name, capital}].
 func _init(states: Array, capitals: Array = []) -> void:
     for s in states:
-        _states.append({"code": String(s["code"]), "name": String(s["name"])})
+        var region := String(s.get("region", ""))
+        _states.append({"code": String(s["code"]), "name": String(s["name"]), "region": region})
+        _region_by_code[String(s["code"])] = region
     for c in capitals:
         _capitals.append(
             {"code": String(c["code"]), "name": String(c["name"]), "capital": String(c["capital"])}
@@ -44,9 +48,27 @@ func mode() -> int:
     return _mode
 
 
+## Set the enabled region names (e.g. {"West": true}). Empty = all regions.
+func set_regions(regions: Dictionary) -> void:
+    _enabled_regions = regions.duplicate()
+
+
+func _region_enabled(code: String) -> bool:
+    if _enabled_regions.is_empty():
+        return true
+    return _enabled_regions.get(_region_by_code.get(code, ""), false)
+
+
 func start() -> void:
     var source: Array = _capitals if _mode == Mode.CAPITAL else _states
-    _queue = source.duplicate(true)
+    _queue = []
+    for item in source:
+        if _region_enabled(String(item["code"])):
+            _queue.append(item.duplicate(true))
+    # Safety: never start an empty quiz (e.g. all regions unchecked). Fall back to all.
+    if _queue.is_empty():
+        for item in source:
+            _queue.append(item.duplicate(true))
     _queue.shuffle()
     _total = _queue.size()
     _index = -1

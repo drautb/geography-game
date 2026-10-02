@@ -1,54 +1,44 @@
 extends Node
-## Drives the REAL main scene to verify the no-Next-button flow: answer correctly,
-## confirm the game latches "awaiting advance", then a click on EMPTY space advances.
+## Drives the REAL main scene to verify region filtering: enable only "West",
+## restart via the game, and confirm every queued prompt is a West state.
 
 const MainScene := preload("res://scenes/main.tscn")
 
 var _frames := 0
 var _main: Node
-var _prompt_code := ""
-var _prompt_count := 0
+var _west := ["AZ", "CO", "ID", "MT", "NV", "NM", "UT", "WY", "AK", "CA", "HI", "OR", "WA"]
 
 
 func _ready() -> void:
     _main = MainScene.instantiate()
     add_child(_main)
-    EventBus.round_advanced.connect(
-        func(code):
-            _prompt_code = code
-            _prompt_count += 1
-    )
 
 
 func _process(_delta: float) -> void:
     _frames += 1
     if _frames == 4:
-        _prompt_code = String(_main._game.current_prompt().get("code", ""))
-        print("round1 prompt=%s" % _prompt_code)
-        EventBus.state_clicked.emit(_prompt_code)
+        # Restrict to the West region only, then restart.
+        _main._game.set_regions({"West": true})
+        _main._game.start()
     if _frames == 6:
-        print("after correct: is_waiting=%s" % _main._game.is_waiting())
-    if _frames == 8:
-        # Click EMPTY ocean (no state) via a raw mouse event to the viewport.
-        var ev := InputEventMouseButton.new()
-        ev.button_index = MOUSE_BUTTON_LEFT
-        ev.position = Vector2(60, 680)  # bottom-left ocean
-        ev.pressed = true
-        Input.parse_input_event(ev)
-        var up := InputEventMouseButton.new()
-        up.button_index = MOUSE_BUTTON_LEFT
-        up.position = Vector2(60, 680)
-        up.pressed = false
-        Input.parse_input_event(up)
-    if _frames == 12:
-        print(
-            (
-                "after empty click: prompt_count=%d is_waiting=%s"
-                % [_prompt_count, _main._game.is_waiting()]
-            )
-        )
-        var image := get_viewport().get_texture().get_image()
-        if image:
-            image.save_png("/project/test_screenshot.png")
-            print("Screenshot saved!")
+        # Walk the whole queue, verifying every entry is a West state.
+        var all_west := true
+        var codes := []
+        var g = _main._game
+        # Peek the internal queue via current_prompt + advance (non-destructive-ish).
+        var seen := {}
+        for i in 60:
+            var p = g.current_prompt()
+            if p.is_empty():
+                break
+            var code = String(p.get("code"))
+            if seen.has(code):
+                break
+            seen[code] = true
+            codes.append(code)
+            if not _west.has(code):
+                all_west = false
+            g._awaiting_advance = true
+            g.continue_game()
+        print("queued=%d all_west=%s codes=%s" % [codes.size(), all_west, str(codes)])
         get_tree().quit()
