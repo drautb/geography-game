@@ -4,7 +4,7 @@ extends Node2D
 ## PNG to /project/test_screenshot.png, then quits.
 
 const MapBuilderScript := preload("res://scripts/map_builder.gd")
-const GEOJSON := "res://data/assets/us_states.geojson"
+const GEOJSON := "res://data/us_states.geojson"
 const VIEWPORT := Vector2(1280, 720)
 
 var _frames := 0

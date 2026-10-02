@@ -40,8 +40,8 @@ Regenerate the projected map/capital GeoJSON from the raw Census data. Requires 
 (mapshaper is fetched on demand, no global install):
 
 ```bash
-bash tools/build_states.sh     # -> data/assets/us_states.geojson
-bash tools/build_capitals.sh   # -> data/assets/capitals.geojson
+bash tools/build_states.sh     # -> data/us_states.geojson
+bash tools/build_capitals.sh   # -> data/capitals.geojson
 ```
 
 Both use mapshaper's `albersusa` composite projection (Albers lower-48 + Alaska inset +
