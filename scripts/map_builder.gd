@@ -56,10 +56,6 @@ const SMALL_STATES := {
     "VT": true,
 }
 
-## Of the small states, these are called out ABOVE the map (northern New England)
-## rather than in the right-hand column.
-const TOP_CALLOUT_STATES := {"VT": true, "NH": true}
-
 
 ## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
 static func set_fill(root: Node, state_code: String, color: Color) -> void:
@@ -186,26 +182,25 @@ static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
 static func _build_name_callouts(container: Node2D, small: Array) -> void:
     if small.is_empty():
         return
-    var top_group: Array = []
+
+    # Per-state explicit label positions for the states whose automatic placement
+    # would route a leader line across another state (tuned against the 1280x720
+    # design layout). VT/NH sit high over empty space north of New England so their
+    # lines go straight up without crossing Maine.
+    var fixed := {
+        "VT": Vector2(930, 60),
+        "NH": Vector2(1045, 60),
+    }
+
     var right_group: Array = []
     for entry in small:
-        if TOP_CALLOUT_STATES.has(String(entry["code"])):
-            top_group.append(entry)
+        var code := String(entry["code"])
+        if fixed.has(code):
+            _draw_callout(container, entry["anchor"], fixed[code], String(entry["name"]))
         else:
             right_group.append(entry)
 
-    # Top group: labels above the map, west-to-east, lines going up.
-    top_group.sort_custom(func(a, b): return a["anchor"].x < b["anchor"].x)
-    var top_y := 70.0
-    var top_x := 980.0
-    var top_step := 150.0
-    for i in top_group.size():
-        var entry: Dictionary = top_group[i]
-        _draw_callout(
-            container, entry["anchor"], Vector2(top_x + top_step * i, top_y), entry["name"]
-        )
-
-    # Right group: staggered column off the east coast, north-to-south.
+    # Everyone else: a staggered column off the east coast, north-to-south.
     right_group.sort_custom(func(a, b): return a["anchor"].y < b["anchor"].y)
     var callout_x := 1150.0
     var top := 190.0
@@ -215,20 +210,29 @@ static func _build_name_callouts(container: Node2D, small: Array) -> void:
         _draw_callout(container, entry["anchor"], Vector2(callout_x, top + step * i), entry["name"])
 
 
-## Draw one leader-line callout: a thin line from the state anchor to the label,
-## plus the left-aligned full-name label at label_pos.
+## Draw one leader-line callout: the full-name label at label_pos (left-aligned),
+## and a thin line from the state anchor to the nearest point on the label's box,
+## so the line meets whichever edge faces the state.
 static func _draw_callout(
     container: Node2D, anchor: Vector2, label_pos: Vector2, name_str: String
 ) -> void:
+    var label := _make_name_label(name_str, label_pos)
+    label.position = label_pos
+    # Estimate the label's rendered box (font size 13 -> ~7px/char, ~18px tall).
+    var box_size := Vector2(name_str.length() * 7.0, 18.0)
+    var attach := _nearest_point_on_box(label_pos, label_pos + box_size, anchor)
     var line := Line2D.new()
-    line.points = PackedVector2Array([anchor, label_pos + Vector2(-4, 8)])
+    line.points = PackedVector2Array([anchor, attach])
     line.width = 1.0
     line.default_color = Color(0.7, 0.75, 0.82, 0.7)
     line.antialiased = true
     container.add_child(line)
-    var label := _make_name_label(name_str, label_pos)
-    label.position = label_pos
     container.add_child(label)
+
+
+## Point on the axis-aligned box [tl, br] nearest to p (p clamped to the box edge).
+static func _nearest_point_on_box(tl: Vector2, br: Vector2, p: Vector2) -> Vector2:
+    return Vector2(clampf(p.x, tl.x, br.x), clampf(p.y, tl.y, br.y))
 
 
 ## A small outlined, centered state-name label for the persistent name layer.
