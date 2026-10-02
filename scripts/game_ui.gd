@@ -6,6 +6,7 @@ extends CanvasLayer
 signal mode_toggled(capital_mode: bool)
 signal regions_changed(enabled: Dictionary)
 
+const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const REGIONS := ["Northeast", "Midwest", "South", "West"]
 
 var _prompt_label: Label
@@ -84,14 +85,22 @@ func _ready() -> void:
 
     col.add_child(HSeparator.new())
 
-    # Focus-regions section.
+    # Focus-regions section. Each row is a color swatch (the legend) + a checkbox.
     col.add_child(_section_title("Focus regions"))
     for region in REGIONS:
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 6)
+        var swatch := ColorRect.new()
+        swatch.color = MapBuilderScript.REGION_COLORS.get(region, Color.WHITE)
+        swatch.custom_minimum_size = Vector2(14, 14)
+        swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        row.add_child(swatch)
         var cb := CheckBox.new()
         cb.text = region
         cb.button_pressed = true
         cb.toggled.connect(_on_region_toggled)
-        col.add_child(cb)
+        row.add_child(cb)
+        col.add_child(row)
         _region_checks[region] = cb
 
     EventBus.round_advanced.connect(_on_round_advanced)
