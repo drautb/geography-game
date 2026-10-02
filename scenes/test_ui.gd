@@ -13,11 +13,6 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
     _frames += 1
-    if _frames == 4:
-        # Disable West via the real signal path (uncheck + emit).
-        var ui = _main._ui
-        ui._region_checks["West"].set_pressed_no_signal(false)
-        ui.regions_changed.emit(ui.enabled_regions())
     if _frames == 8:
         var image := get_viewport().get_texture().get_image()
         if image:

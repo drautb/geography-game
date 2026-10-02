@@ -51,44 +51,72 @@ func _ready() -> void:
     _feedback_label.offset_bottom = 90
     add_child(_feedback_label)
 
-    # Mode radio buttons (top-left), grouped so exactly one is selected.
-    var mode_box := VBoxContainer.new()
-    mode_box.position = Vector2(20, 14)
-    add_child(mode_box)
-    var mode_title := Label.new()
-    mode_title.text = "Mode"
-    mode_box.add_child(mode_title)
+    # Grouped control panel (top-left): Mode radios + Focus-region checkboxes
+    # inside a single subtly-bordered panel.
+    var panel := PanelContainer.new()
+    panel.position = Vector2(16, 14)
+    panel.add_theme_stylebox_override("panel", _panel_style())
+    add_child(panel)
+
+    var margin := MarginContainer.new()
+    for side in ["left", "right", "top", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 12)
+    panel.add_child(margin)
+
+    var col := VBoxContainer.new()
+    col.add_theme_constant_override("separation", 6)
+    margin.add_child(col)
+
+    # Mode section.
+    col.add_child(_section_title("Mode"))
     var group := ButtonGroup.new()
     _state_radio = CheckBox.new()
     _state_radio.text = "States"
     _state_radio.button_group = group
     _state_radio.button_pressed = true
     _state_radio.toggled.connect(_on_state_radio_toggled)
-    mode_box.add_child(_state_radio)
+    col.add_child(_state_radio)
     _capital_radio = CheckBox.new()
     _capital_radio.text = "Capitals"
     _capital_radio.button_group = group
     _capital_radio.toggled.connect(_on_capital_radio_toggled)
-    mode_box.add_child(_capital_radio)
+    col.add_child(_capital_radio)
 
-    # Region focus checkboxes (bottom-left), all on by default.
-    var region_box := VBoxContainer.new()
-    region_box.position = Vector2(20, 520)
-    add_child(region_box)
-    var region_title := Label.new()
-    region_title.text = "Focus regions"
-    region_box.add_child(region_title)
+    col.add_child(HSeparator.new())
+
+    # Focus-regions section.
+    col.add_child(_section_title("Focus regions"))
     for region in REGIONS:
         var cb := CheckBox.new()
         cb.text = region
         cb.button_pressed = true
         cb.toggled.connect(_on_region_toggled)
-        region_box.add_child(cb)
+        col.add_child(cb)
         _region_checks[region] = cb
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
     EventBus.game_over.connect(_on_game_over)
+
+
+## A subtle translucent panel with a thin border and rounded corners.
+func _panel_style() -> StyleBoxFlat:
+    var sb := StyleBoxFlat.new()
+    sb.bg_color = Color(0.14, 0.17, 0.22, 0.85)
+    sb.border_color = Color(0.42, 0.48, 0.56, 0.7)
+    sb.set_border_width_all(1)
+    sb.set_corner_radius_all(6)
+    sb.set_content_margin_all(4)
+    return sb
+
+
+## A small, slightly muted section heading.
+func _section_title(text: String) -> Label:
+    var label := Label.new()
+    label.text = text
+    label.add_theme_font_size_override("font_size", 13)
+    label.add_theme_color_override("font_color", Color(0.72, 0.78, 0.86))
+    return label
 
 
 ## main.gd supplies the display label; the prefix reflects the current mode.
