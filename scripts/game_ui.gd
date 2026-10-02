@@ -87,8 +87,8 @@ func _ready() -> void:
 
     col.add_child(HSeparator.new())
 
-    # Focus-regions section. Each row is a color swatch (the legend) + a checkbox.
-    col.add_child(_section_title("Focus regions"))
+    # Regions section. Each row is a color swatch (the legend) + a checkbox.
+    col.add_child(_section_title("Regions"))
     for region in REGIONS:
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 6)
@@ -105,18 +105,38 @@ func _ready() -> void:
         col.add_child(row)
         _region_checks[region] = cb
 
-    col.add_child(HSeparator.new())
-
-    # Options section.
-    col.add_child(_section_title("Options"))
-    _names_check = CheckBox.new()
-    _names_check.text = "Show state names"
-    _names_check.toggled.connect(_on_names_toggled)
-    col.add_child(_names_check)
+    _build_options_panel()
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
     EventBus.game_over.connect(_on_game_over)
+
+
+## A separate panel anchored to the bottom-left holding display options.
+func _build_options_panel() -> void:
+    var panel := PanelContainer.new()
+    panel.add_theme_stylebox_override("panel", _panel_style())
+    panel.anchor_top = 1.0
+    panel.anchor_bottom = 1.0
+    panel.offset_left = 16
+    panel.offset_top = -80
+    panel.offset_bottom = -24
+    add_child(panel)
+
+    var margin := MarginContainer.new()
+    for side in ["left", "right", "top", "bottom"]:
+        margin.add_theme_constant_override("margin_" + side, 12)
+    panel.add_child(margin)
+
+    var col := VBoxContainer.new()
+    col.add_theme_constant_override("separation", 6)
+    margin.add_child(col)
+
+    col.add_child(_section_title("Options"))
+    _names_check = CheckBox.new()
+    _names_check.text = "State Names"
+    _names_check.toggled.connect(_on_names_toggled)
+    col.add_child(_names_check)
 
 
 ## A subtle translucent panel with a thin border and rounded corners.
