@@ -32,6 +32,7 @@ func _ready() -> void:
 
     _ui = GameUiScript.new()
     add_child(_ui)
+    _ui.set_name_lookup(_name_by_code)
     _ui.next_requested.connect(_on_next_requested)
 
     EventBus.round_advanced.connect(_on_round_advanced)
@@ -59,28 +60,17 @@ func _on_round_advanced(code: String) -> void:
 
 
 func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
-    var prompt_code: String = _game.current_prompt().get("code", "")
     if correct:
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_CORRECT)
-        _last_answer_code = clicked_code
     else:
-        # Mark the wrong click red and reveal the correct state in green.
+        # Only mark the wrong click red — do NOT reveal the correct state, so the
+        # player still has to find it when it comes back around.
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_WRONG)
-        MapBuilderScript.set_fill(self, prompt_code, MapBuilderScript.FILL_CORRECT)
-        _reveal_both(clicked_code, prompt_code)
+    _last_answer_code = clicked_code
     _ui.set_score(_game.score(), _game.total())
 
 
-func _reveal_both(a: String, b: String) -> void:
-    _last_answer_code = a
-    # Track both so the next round can reset them.
-    set_meta("extra_reset", b)
-
-
 func _on_next_requested() -> void:
-    if has_meta("extra_reset"):
-        MapBuilderScript.set_fill(self, get_meta("extra_reset"), MapBuilderScript.FILL_COLOR)
-        remove_meta("extra_reset")
     if _is_over:
         _is_over = false
         _reset_all_fills()

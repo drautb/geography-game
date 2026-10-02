@@ -6,26 +6,30 @@ class_name GameManager
 ## the answer against the current prompt, updates the score, and advances. Communicates
 ## outward only through EventBus signals so the UI and map stay decoupled.
 
-var _queue: Array[Dictionary] = []
+var _states: Array[Dictionary] = []
+var _queue: Array = []
 var _index := -1
 var _score := 0
 var _total := 0
 var _answered := false
+var _solved := {}
 
 
 ## states: Array of {code, name} dictionaries (from MapData / the GeoJSON properties).
 func _init(states: Array) -> void:
     for s in states:
-        _queue.append({"code": String(s["code"]), "name": String(s["name"])})
-    _queue.shuffle()
-    _total = _queue.size()
+        _states.append({"code": String(s["code"]), "name": String(s["name"])})
+    _total = _states.size()
     EventBus.state_clicked.connect(_on_state_clicked)
 
 
 func start() -> void:
+    _queue = _states.duplicate(true)
+    _queue.shuffle()
     _index = -1
     _score = 0
     _answered = false
+    _solved = {}
     _advance()
 
 
@@ -49,7 +53,13 @@ func _on_state_clicked(state_code: String) -> void:
     var prompt: Dictionary = _queue[_index]
     var correct: bool = state_code == String(prompt["code"])
     if correct:
-        _score += 1
+        # Count each state only once, even if it was missed earlier and requeued.
+        if not _solved.has(String(prompt["code"])):
+            _solved[String(prompt["code"])] = true
+            _score += 1
+    else:
+        # Requeue the missed state so it comes back later this run.
+        _queue.append(prompt)
     _answered = true
     EventBus.answer_resolved.emit(state_code, correct)
 

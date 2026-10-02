@@ -11,6 +11,7 @@ var _feedback_label: Label
 var _next_button: Button
 
 var _prompt_name := ""
+var _name_by_code := {}
 
 
 func _ready() -> void:
@@ -69,6 +70,11 @@ func set_prompt_name(state_name: String) -> void:
     _prompt_label.text = "Find: %s" % state_name
 
 
+## Supply the code -> full name map so wrong-answer feedback can name the clicked state.
+func set_name_lookup(lookup: Dictionary) -> void:
+    _name_by_code = lookup
+
+
 func set_score(score: int, total: int) -> void:
     _score_label.text = "Score: %d / %d" % [score, total]
 
@@ -78,12 +84,13 @@ func _on_round_advanced(_code: String) -> void:
     _next_button.visible = false
 
 
-func _on_answer_resolved(_code: String, correct: bool) -> void:
+func _on_answer_resolved(code: String, correct: bool) -> void:
     if correct:
         _feedback_label.text = "Correct!"
         _feedback_label.add_theme_color_override("font_color", Color(0.4, 0.85, 0.45))
     else:
-        _feedback_label.text = "Not quite — that was %s" % _prompt_name
+        var clicked_name: String = _name_by_code.get(code, code)
+        _feedback_label.text = "That's %s — try again next round" % clicked_name
         _feedback_label.add_theme_color_override("font_color", Color(0.9, 0.5, 0.45))
     _next_button.visible = true
 
