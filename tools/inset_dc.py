@@ -60,6 +60,8 @@ def main() -> int:
         return [transform(c) for c in coords]
 
     dc["geometry"]["coordinates"] = transform(dc["geometry"]["coordinates"])
+    # Use a friendlier display name than the Census "District of Columbia".
+    dc["properties"]["name"] = "Washington D.C."
     # Record provenance so the game can draw a leader line and we stay idempotent.
     dc["properties"]["inset"] = True
     dc["properties"]["origin"] = [round(cx, 1), round(cy, 1)]

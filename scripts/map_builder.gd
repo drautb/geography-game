@@ -86,12 +86,17 @@ static func build_capitals(parent: Node2D, geojson_path: String, t: Transform) -
         parent.add_child(container)
         return container
 
+    var pin_positions := {}
     for feature in data["features"]:
         var coords = feature.get("geometry", {}).get("coordinates", null)
         if coords == null:
             continue
         var pos := t.apply(coords[0], coords[1])
+        var code := String(feature.get("properties", {}).get("code", ""))
+        pin_positions[code] = pos
         container.add_child(_make_pin(pos))
+    # Expose code -> pin screen position so the game can place capital labels.
+    container.set_meta("pin_positions", pin_positions)
     parent.add_child(container)
     return container
 
@@ -245,6 +250,9 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
     area.input_pickable = true
     area.input_event.connect(_on_area_input.bind(code))
 
+    var best_anchor := Vector2.ZERO
+    var best_area := -1.0
+
     for part in _iter_parts(geom):
         # part = list of rings; ring 0 is the outer boundary, rest are holes.
         for ring_index in part.size():
@@ -269,6 +277,13 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
                 col.polygon = points
                 area.add_child(col)
 
+                # Track the largest part's centroid as the on-map label anchor, so a
+                # label lands on the main landmass rather than a small island.
+                var a := _ring_area(points)
+                if a > best_area:
+                    best_area = a
+                    best_anchor = _ring_centroid(points)
+
             # Border outline for every ring (closed loop).
             var line := Line2D.new()
             var loop := points.duplicate()
@@ -280,7 +295,41 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
             line.antialiased = true
             area.add_child(line)
 
+    area.set_meta("label_pos", best_anchor)
     parent.add_child(area)
+
+
+## Shoelace area (absolute) of a screen-space ring, for picking the largest part.
+static func _ring_area(pts: PackedVector2Array) -> float:
+    var a := 0.0
+    var n := pts.size()
+    for i in n:
+        var p := pts[i]
+        var q := pts[(i + 1) % n]
+        a += p.x * q.y - q.x * p.y
+    return absf(a) * 0.5
+
+
+## Area-weighted centroid of a screen-space ring (falls back to vertex mean).
+static func _ring_centroid(pts: PackedVector2Array) -> Vector2:
+    var n := pts.size()
+    var cx := 0.0
+    var cy := 0.0
+    var a := 0.0
+    for i in n:
+        var p := pts[i]
+        var q := pts[(i + 1) % n]
+        var cross := p.x * q.y - q.x * p.y
+        cx += (p.x + q.x) * cross
+        cy += (p.y + q.y) * cross
+        a += cross
+    if absf(a) < 0.0001:
+        var mean := Vector2.ZERO
+        for p in pts:
+            mean += p
+        return mean / maxf(1.0, n)
+    a *= 0.5
+    return Vector2(cx / (6.0 * a), cy / (6.0 * a))
 
 
 ## Emit EventBus.state_clicked on a left-click release within a state's area.
