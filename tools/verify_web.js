@@ -52,7 +52,9 @@ const server = http.createServer((req, res) => {
   const canvas = await page.$("canvas");
   if (canvas) {
     const box = await canvas.boundingBox();
-    await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.45);
+    // Click the DC callout off the east coast (fraction 0.869, 0.465 of the
+    // design viewport) to verify the enlarged inset is clickable.
+    await page.mouse.click(box.x + box.width * 0.869, box.y + box.height * 0.465);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: "/project/browser_click.png" });
   }

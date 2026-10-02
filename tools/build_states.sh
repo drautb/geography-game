@@ -29,4 +29,7 @@ npx -y mapshaper@latest "$RAW" \
   -filter-fields code,name,fips \
   -o "$OUT" format=geojson precision=1
 
+# Enlarge DC and move it to an ocean callout (keeps it a clickable quiz target).
+python3 "$(dirname "$0")/inset_dc.py"
+
 echo "wrote $OUT"

@@ -134,8 +134,31 @@ static func build(
         if geom == null:
             continue
         var props: Dictionary = feature.get("properties", {})
+        # Draw a leader line from an inset state's true location to its callout,
+        # under the state fill so the polygon sits on top of the line's end.
+        if props.has("origin") and props.has("callout"):
+            _build_leader(parent, props["origin"], props["callout"], t)
         _build_state(parent, geom, props, t)
     return t
+
+
+## Thin dashed-looking leader from an inset state's true location to its callout.
+static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Transform) -> void:
+    var line := Line2D.new()
+    line.points = PackedVector2Array(
+        [t.apply(origin[0], origin[1]), t.apply(callout[0], callout[1])]
+    )
+    line.width = 1.0
+    line.default_color = Color(0.55, 0.62, 0.72, 0.8)
+    line.antialiased = true
+    parent.add_child(line)
+    # A small dot at the true location so the origin reads clearly.
+    var dot := Line2D.new()
+    var o := t.apply(origin[0], origin[1])
+    dot.points = PackedVector2Array([o + Vector2(-2, 0), o + Vector2(2, 0)])
+    dot.width = 4.0
+    dot.default_color = Color(0.85, 0.78, 0.45)
+    parent.add_child(dot)
 
 
 static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform) -> void:
