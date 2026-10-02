@@ -1,0 +1,4 @@
+line_length: 100
+use_spaces: 4
+excluded_directories:
+  .git:

@@ -1,0 +1,20 @@
+# Godot binary (download per the setup docs, don't commit)
+Godot_v4.7.2-stable_linux.x86_64
+*.zip
+*.tpz
+
+# Godot editor cache (regenerated on open)
+.godot/
+
+# WASM export output (ephemeral, regenerate with the export command)
+export/
+
+# Screenshot iteration artifacts
+test_screenshot.png
+test_screenshot.png.import
+test_frame.wav
+test_frame.wav.import
+core.*
+
+# Large intermediate data (keep raw source + final build, drop scratch)
+data/raw/*.zip
