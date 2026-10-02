@@ -12,6 +12,7 @@ const STATES_GEOJSON := "res://data/us_states.geojson"
 const CAPITALS_GEOJSON := "res://data/capitals.geojson"
 const DESIGN_SIZE := Vector2(1280, 720)
 const AUTO_ADVANCE_DELAY := 1.0
+const PANEL_INSET := 120.0
 
 var _map_root: Node2D
 var _game
@@ -36,7 +37,8 @@ func _ready() -> void:
     _map_root = Node2D.new()
     _map_root.name = "MapRoot"
     add_child(_map_root)
-    var t = MapBuilderScript.build(_map_root, STATES_GEOJSON, DESIGN_SIZE)
+    # Reserve space on the left for the control panel so the West Coast clears it.
+    var t = MapBuilderScript.build(_map_root, STATES_GEOJSON, DESIGN_SIZE, 40.0, PANEL_INSET)
 
     var states := MapBuilderScript.load_state_list(STATES_GEOJSON)
     for s in states:

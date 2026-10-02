@@ -183,13 +183,20 @@ static func _build_name_callouts(container: Node2D, small: Array) -> void:
     if small.is_empty():
         return
 
-    # Per-state explicit label positions for the states whose automatic placement
-    # would route a leader line across another state (tuned against the 1280x720
-    # design layout). VT/NH sit high over empty space north of New England so their
-    # lines go straight up without crossing Maine.
+    # Explicit label position for each small, tightly-packed state, hand-tuned
+    # against the 1280x720 design layout to sit as close to its state as possible
+    # without overlapping other states, labels, or leader lines. The northern New
+    # England states fan across the open space above; the mid-Atlantic trio sits in
+    # the Atlantic to the right. States not listed fall back to a right column.
     var fixed := {
-        "VT": Vector2(930, 60),
-        "NH": Vector2(1045, 60),
+        "VT": Vector2(975, 72),
+        "NH": Vector2(1085, 55),
+        "MA": Vector2(1168, 150),
+        "RI": Vector2(1168, 192),
+        "CT": Vector2(1168, 228),
+        "NJ": Vector2(1168, 276),
+        "DE": Vector2(1168, 312),
+        "MD": Vector2(1120, 356),
     }
 
     var right_group: Array = []
@@ -200,27 +207,31 @@ static func _build_name_callouts(container: Node2D, small: Array) -> void:
         else:
             right_group.append(entry)
 
-    # Everyone else: a staggered column off the east coast, north-to-south.
+    # Fallback for any small state not explicitly placed: a staggered right column.
     right_group.sort_custom(func(a, b): return a["anchor"].y < b["anchor"].y)
-    var callout_x := 1150.0
-    var top := 190.0
+    var callout_x := 1190.0
+    var top := 150.0
     var step := 26.0
     for i in right_group.size():
         var entry: Dictionary = right_group[i]
         _draw_callout(container, entry["anchor"], Vector2(callout_x, top + step * i), entry["name"])
 
 
-## Draw one leader-line callout: the full-name label at label_pos (left-aligned),
-## and a thin line from the state anchor to the nearest point on the label's box,
-## so the line meets whichever edge faces the state.
+## Draw one leader-line callout: the full-name label near label_pos, and a thin
+## line from the state anchor to the nearest point on the label's box. The label's
+## x is clamped so a wide name never runs off the right edge of the viewport.
 static func _draw_callout(
     container: Node2D, anchor: Vector2, label_pos: Vector2, name_str: String
 ) -> void:
-    var label := _make_name_label(name_str, label_pos)
-    label.position = label_pos
     # Estimate the label's rendered box (font size 13 -> ~7px/char, ~18px tall).
     var box_size := Vector2(name_str.length() * 7.0, 18.0)
-    var attach := _nearest_point_on_box(label_pos, label_pos + box_size, anchor)
+    # Keep the whole label on screen (8px margin from the 1280-wide viewport).
+    var x := minf(label_pos.x, 1280.0 - 8.0 - box_size.x)
+    x = maxf(x, 8.0)
+    var pos := Vector2(x, label_pos.y)
+    var label := _make_name_label(name_str, pos)
+    label.position = pos
+    var attach := _nearest_point_on_box(pos, pos + box_size, anchor)
     var line := Line2D.new()
     line.points = PackedVector2Array([anchor, attach])
     line.width = 1.0
@@ -282,8 +293,11 @@ class Transform:
 
 
 ## Compute a uniform scale + offset that fits the GeoJSON bbox into target_size
-## (with padding), centered.
-static func _compute_transform(features: Array, target_size: Vector2, padding: float) -> Transform:
+## (with padding). `left_inset` reserves space on the left (for the control panel)
+## so the map is centered in the region to the right of it.
+static func _compute_transform(
+    features: Array, target_size: Vector2, padding: float, left_inset: float
+) -> Transform:
     var min_x := INF
     var min_y := INF
     var max_x := -INF
@@ -304,16 +318,18 @@ static func _compute_transform(features: Array, target_size: Vector2, padding: f
     # layout). Fall back to a sane default so geometry is never drawn off-screen.
     if target_size.x < 1.0 or target_size.y < 1.0:
         target_size = Vector2(1280, 720)
-    var avail := target_size - Vector2(padding, padding) * 2.0
+    # The map lives in the region to the RIGHT of left_inset, with padding.
+    var region := Vector2(target_size.x - left_inset, target_size.y)
+    var avail := region - Vector2(padding, padding) * 2.0
     var scale := minf(avail.x / span_x, avail.y / span_y)
 
     var t := Transform.new()
     t.scale = scale
-    # Center the scaled map within target_size. Y uses the flipped convention:
-    # geo max_y maps to the top (smallest screen Y).
+    # Center the scaled map within the right-of-inset region. Y uses the flipped
+    # convention: geo max_y maps to the top (smallest screen Y).
     var drawn := Vector2(span_x, span_y) * scale
-    var margin := (target_size - drawn) * 0.5
-    t.offset = Vector2(margin.x - min_x * scale, margin.y + max_y * scale)
+    var margin := (region - drawn) * 0.5
+    t.offset = Vector2(left_inset + margin.x - min_x * scale, margin.y + max_y * scale)
     t.size = target_size
     return t
 
@@ -341,7 +357,7 @@ static func _iter_parts(geom: Dictionary) -> Array:
 ## Load the GeoJSON and build all state nodes under `parent`.
 ## Returns the Transform used (so capitals can be placed in the same space).
 static func build(
-    parent: Node2D, geojson_path: String, target_size: Vector2, padding := 40.0
+    parent: Node2D, geojson_path: String, target_size: Vector2, padding := 40.0, left_inset := 0.0
 ) -> Transform:
     var text := FileAccess.get_file_as_string(geojson_path)
     if text.is_empty():
@@ -353,7 +369,7 @@ static func build(
         return null
 
     var features: Array = data["features"]
-    var t := _compute_transform(features, target_size, padding)
+    var t := _compute_transform(features, target_size, padding, left_inset)
 
     for feature in features:
         var geom = feature.get("geometry")
