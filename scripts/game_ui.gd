@@ -4,14 +4,17 @@ extends CanvasLayer
 ## advance. Built in code (no .tscn) to keep the UI versioned as a single script.
 
 signal next_requested
+signal mode_toggled(capital_mode: bool)
 
 var _prompt_label: Label
 var _score_label: Label
 var _feedback_label: Label
 var _next_button: Button
+var _mode_button: Button
 
 var _prompt_name := ""
 var _name_by_code := {}
+var _capital_mode := false
 
 
 func _ready() -> void:
@@ -59,20 +62,39 @@ func _ready() -> void:
     _next_button.pressed.connect(_on_next_pressed)
     add_child(_next_button)
 
+    _mode_button = Button.new()
+    _mode_button.text = "Mode: States"
+    _mode_button.offset_left = 20
+    _mode_button.offset_top = 16
+    _mode_button.offset_right = 180
+    _mode_button.offset_bottom = 48
+    _mode_button.pressed.connect(_on_mode_pressed)
+    add_child(_mode_button)
+
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
     EventBus.game_over.connect(_on_game_over)
 
 
-## main.gd supplies the name for each prompt code (code -> full name lookup).
-func set_prompt_name(state_name: String) -> void:
-    _prompt_name = state_name
-    _prompt_label.text = "Find: %s" % state_name
+## main.gd supplies the display label for each prompt (state name, or capital in
+## capitals mode). The instruction prefix reflects the current mode.
+func set_prompt_name(label: String) -> void:
+    _prompt_name = label
+    if _capital_mode:
+        _prompt_label.text = "Which state's capital is %s?" % label
+    else:
+        _prompt_label.text = "Find: %s" % label
 
 
 ## Supply the code -> full name map so wrong-answer feedback can name the clicked state.
 func set_name_lookup(lookup: Dictionary) -> void:
     _name_by_code = lookup
+
+
+func set_capital_mode(on: bool) -> void:
+    _capital_mode = on
+    if _mode_button != null:
+        _mode_button.text = "Mode: Capitals" if on else "Mode: States"
 
 
 func set_score(score: int, total: int) -> void:
@@ -108,3 +130,8 @@ func _on_game_over(score: int, total: int) -> void:
 func _on_next_pressed() -> void:
     _next_button.text = "Next"
     next_requested.emit()
+
+
+func _on_mode_pressed() -> void:
+    set_capital_mode(not _capital_mode)
+    mode_toggled.emit(_capital_mode)

@@ -1,13 +1,20 @@
 extends RefCounted
 class_name GameManager
-## "Find the state" game logic. Pure state + rules, no scene-tree coupling.
+## State / capital quiz logic. Pure state + rules, no scene-tree coupling.
 ##
-## Owns a shuffled queue of prompt states. The player keeps guessing until they
-## click the correct state; a round resolves only on a correct click. A point is
-## awarded only for a first-try solve. Communicates outward only through EventBus
-## signals so the UI and map stay decoupled.
+## Two modes:
+##   STATE   — prompt a state name; click that state.
+##   CAPITAL — prompt a capital city; click the state it is the capital of.
+## In both modes the answer is a STATE click. Capital mode quizzes only the 50
+## states that have capital data (DC has none). The player keeps guessing until
+## correct; a round resolves only on a correct click; a point is awarded only for
+## a first-try solve. Communicates outward only through EventBus signals.
+
+enum Mode { STATE, CAPITAL }
 
 var _states: Array[Dictionary] = []
+var _capitals: Array[Dictionary] = []
+var _mode: int = Mode.STATE
 var _queue: Array = []
 var _index := -1
 var _score := 0
@@ -17,20 +24,34 @@ var _missed_this_round := false
 var _solved := {}
 
 
-## states: Array of {code, name} dictionaries (from MapData / the GeoJSON properties).
-func _init(states: Array) -> void:
+## states: [{code, name}]; capitals: [{code, name, capital}] (may be fewer entries).
+func _init(states: Array, capitals: Array = []) -> void:
     for s in states:
         _states.append({"code": String(s["code"]), "name": String(s["name"])})
-    _total = _states.size()
+    for c in capitals:
+        _capitals.append(
+            {"code": String(c["code"]), "name": String(c["name"]), "capital": String(c["capital"])}
+        )
     EventBus.state_clicked.connect(_on_state_clicked)
 
 
+func set_mode(mode: int) -> void:
+    _mode = mode
+
+
+func mode() -> int:
+    return _mode
+
+
 func start() -> void:
-    _queue = _states.duplicate(true)
+    var source: Array = _capitals if _mode == Mode.CAPITAL else _states
+    _queue = source.duplicate(true)
     _queue.shuffle()
+    _total = _queue.size()
     _index = -1
     _score = 0
     _answered = false
+    _missed_this_round = false
     _solved = {}
     _advance()
 
@@ -39,6 +60,17 @@ func current_prompt() -> Dictionary:
     if _index < 0 or _index >= _queue.size():
         return {}
     return _queue[_index]
+
+
+## Text to display for the current prompt: the capital in CAPITAL mode, else the
+## state name.
+func prompt_label() -> String:
+    var p := current_prompt()
+    if p.is_empty():
+        return ""
+    if _mode == Mode.CAPITAL:
+        return String(p.get("capital", ""))
+    return String(p.get("name", ""))
 
 
 func score() -> int:

@@ -18,6 +18,8 @@ const FILL_WRONG := Color(0.82, 0.36, 0.33)
 const FILL_HIGHLIGHT := Color(0.95, 0.78, 0.35)
 const BORDER_COLOR := Color(0.12, 0.17, 0.24)
 const BORDER_WIDTH := 1.5
+const CAPITAL_COLOR := Color(0.98, 0.85, 0.4)
+const CAPITAL_RING := Color(0.2, 0.16, 0.1)
 
 ## Group name applied to every state's fill polygons, so set_fill() can recolor a
 ## whole state (including multipolygon parts) by its postal code.
@@ -43,6 +45,79 @@ static func load_state_list(geojson_path: String) -> Array:
         var props: Dictionary = feature.get("properties", {})
         out.append({"code": props.get("code", ""), "name": props.get("name", "")})
     return out
+
+
+## Read the capitals list as [{code, name, capital}] from a capitals GeoJSON.
+static func load_capital_list(geojson_path: String) -> Array:
+    var out: Array = []
+    var text := FileAccess.get_file_as_string(geojson_path)
+    if text.is_empty():
+        push_error("MapBuilder: could not read %s" % geojson_path)
+        return out
+    var data = JSON.parse_string(text)
+    if data == null or not data.has("features"):
+        return out
+    for feature in data["features"]:
+        var props: Dictionary = feature.get("properties", {})
+        out.append(
+            {
+                "code": props.get("code", ""),
+                "name": props.get("name", ""),
+                "capital": props.get("capital", "")
+            }
+        )
+    return out
+
+
+## Draw a dot marker for each capital under `parent`, using the SAME transform the
+## states were built with (so pins land on the map). Pins are plain Node2D visuals
+## with no Area2D, so clicks pass through to the state beneath. Returns the pin
+## container so it can be shown/hidden per game mode.
+static func build_capitals(parent: Node2D, geojson_path: String, t: Transform) -> Node2D:
+    var container := Node2D.new()
+    container.name = "CapitalPins"
+    var text := FileAccess.get_file_as_string(geojson_path)
+    if text.is_empty():
+        push_error("MapBuilder: could not read %s" % geojson_path)
+        parent.add_child(container)
+        return container
+    var data = JSON.parse_string(text)
+    if data == null or not data.has("features"):
+        parent.add_child(container)
+        return container
+
+    for feature in data["features"]:
+        var coords = feature.get("geometry", {}).get("coordinates", null)
+        if coords == null:
+            continue
+        var pos := t.apply(coords[0], coords[1])
+        container.add_child(_make_pin(pos))
+    parent.add_child(container)
+    return container
+
+
+## A small star/dot capital marker: a filled circle with a thin dark outline.
+static func _make_pin(pos: Vector2) -> Node2D:
+    var pin := Node2D.new()
+    pin.position = pos
+    var r := 3.5
+    var pts := PackedVector2Array()
+    for i in 12:
+        var a := TAU * i / 12.0
+        pts.append(Vector2(cos(a), sin(a)) * r)
+    var fill := Polygon2D.new()
+    fill.polygon = pts
+    fill.color = CAPITAL_COLOR
+    pin.add_child(fill)
+    var ring := Line2D.new()
+    var loop := pts.duplicate()
+    loop.append(pts[0])
+    ring.points = loop
+    ring.width = 1.0
+    ring.default_color = CAPITAL_RING
+    ring.antialiased = true
+    pin.add_child(ring)
+    return pin
 
 
 class Transform:

@@ -52,10 +52,13 @@ const server = http.createServer((req, res) => {
   const canvas = await page.$("canvas");
   if (canvas) {
     const box = await canvas.boundingBox();
-    // Click the DC callout off the east coast (fraction 0.869, 0.465 of the
-    // design viewport) to verify the enlarged inset is clickable.
-    await page.mouse.click(box.x + box.width * 0.869, box.y + box.height * 0.465);
+    // Click the "Mode" button (top-left) to switch to capitals mode, then screenshot.
+    await page.mouse.click(box.x + box.width * 0.078, box.y + box.height * 0.044);
     await page.waitForTimeout(1500);
+    await page.screenshot({ path: "/project/browser_capitals.png" });
+    // Then click the DC callout (wrong in capitals mode = DC not quizzed, but tests click-through).
+    await page.mouse.click(box.x + box.width * 0.869, box.y + box.height * 0.465);
+    await page.waitForTimeout(1200);
     await page.screenshot({ path: "/project/browser_click.png" });
   }
 
