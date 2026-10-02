@@ -134,6 +134,17 @@ func is_waiting() -> bool:
     return _awaiting_advance or _awaiting_restart
 
 
+## True only when a correct answer is latched (round auto-advances); false at
+## game over, which waits for a click to restart.
+func is_awaiting_advance() -> bool:
+    return _awaiting_advance
+
+
+## True only at game over, waiting for a click to restart.
+func is_awaiting_restart() -> bool:
+    return _awaiting_restart
+
+
 ## Consume the "any click" that advances to the next prompt (or restarts after
 ## game over). Called by main.gd for clicks anywhere, including empty space.
 func continue_game() -> void:

@@ -11,6 +11,7 @@ const GameUiScript := preload("res://scripts/game_ui.gd")
 const STATES_GEOJSON := "res://data/us_states.geojson"
 const CAPITALS_GEOJSON := "res://data/capitals.geojson"
 const DESIGN_SIZE := Vector2(1280, 720)
+const AUTO_ADVANCE_DELAY := 1.0
 
 var _map_root: Node2D
 var _game
@@ -18,6 +19,7 @@ var _ui: CanvasLayer
 var _name_by_code := {}
 var _region_by_code := {}
 var _enabled_regions := {}
+var _advance_token := 0
 var _last_answer_code := ""
 var _wrong_code := ""
 var _pins: Node2D
@@ -73,17 +75,18 @@ func _base_fill(code: String) -> Color:
     return MapBuilderScript.region_color(region, on)
 
 
-## Any left-click advances when the game is waiting (after a correct answer or
-## game over). State clicks while playing are handled by the Area2D -> state_clicked
-## path; this only acts on the "click anywhere to continue" states.
+## At game over, any left-click restarts. Rounds now auto-advance after a delay,
+## so clicks are not needed to continue mid-game.
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseButton:
         var mb := event as InputEventMouseButton
-        if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _game.is_waiting():
+        if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _game.is_awaiting_restart():
             _game.continue_game()
 
 
 func _on_round_advanced(code: String) -> void:
+    # A new round is live; invalidate any pending auto-advance timer.
+    _advance_token += 1
     # Reset the previous round's coloring and labels, then show the new prompt.
     if _last_answer_code != "":
         MapBuilderScript.set_fill(self, _last_answer_code, _base_fill(_last_answer_code))
@@ -103,6 +106,10 @@ func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
         _wrong_code = ""
         MapBuilderScript.set_fill(self, clicked_code, MapBuilderScript.FILL_CORRECT)
         _last_answer_code = clicked_code
+        # Auto-advance after a brief pause (unless this correct answer ended the
+        # game, which waits for a click to restart).
+        if _game.is_awaiting_advance():
+            _schedule_auto_advance()
     else:
         if _wrong_code != "":
             MapBuilderScript.set_fill(self, _wrong_code, _base_fill(_wrong_code))
@@ -111,6 +118,19 @@ func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
         _last_answer_code = clicked_code
     _show_click_label(clicked_code, correct)
     _ui.set_score(_game.score(), _game.total())
+
+
+## Advance to the next prompt ~1s after a correct answer. A token guards against a
+## stale timer firing after the game state changed (mode/region switch, restart).
+func _schedule_auto_advance() -> void:
+    _advance_token += 1
+    var token := _advance_token
+    var timer := get_tree().create_timer(AUTO_ADVANCE_DELAY)
+    timer.timeout.connect(
+        func():
+            if token == _advance_token and _game.is_awaiting_advance():
+                _game.continue_game()
+    )
 
 
 ## Show the clicked state's name over it (states mode) or its capital near the pin

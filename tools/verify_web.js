@@ -53,19 +53,14 @@ const server = http.createServer((req, res) => {
   if (canvas) {
     const box = await canvas.boundingBox();
     const cx = (fx, fy) => page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
-    // Initial: radios + region checkboxes visible.
     await page.screenshot({ path: "/project/browser_states.png" });
-    // Click the "Capitals" radio (top-left, second row under Mode).
-    await cx(0.03, 0.127);
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: "/project/browser_capitals.png" });
-    // Uncheck three region checkboxes (bottom-left), leaving only one region.
-    await cx(0.025, 0.781); // Northeast
-    await page.waitForTimeout(300);
-    await cx(0.025, 0.83); // Midwest
-    await page.waitForTimeout(300);
-    await cx(0.025, 0.879); // South
-    await page.waitForTimeout(800);
+    // Click several states across the map with >1s pauses. One will be the prompt;
+    // auto-advance should then move to a new prompt on its own (no further click).
+    const pts = [[0.46, 0.68], [0.3, 0.3], [0.65, 0.4], [0.5, 0.55], [0.8, 0.3]];
+    for (const [fx, fy] of pts) {
+      await cx(fx, fy);
+      await page.waitForTimeout(1400);
+    }
     await page.screenshot({ path: "/project/browser_click.png" });
   }
 

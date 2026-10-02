@@ -186,7 +186,7 @@ func _on_round_advanced(_code: String) -> void:
 
 func _on_answer_resolved(_code: String, correct: bool) -> void:
     if correct:
-        _feedback_label.text = "Correct! Click anywhere to continue"
+        _feedback_label.text = "Correct!"
         _feedback_label.add_theme_color_override("font_color", Color(0.4, 0.85, 0.45))
     else:
         _feedback_label.text = "Keep looking"
