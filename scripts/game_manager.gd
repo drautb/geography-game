@@ -19,7 +19,8 @@ var _queue: Array = []
 var _index := -1
 var _score := 0
 var _total := 0
-var _answered := false
+var _awaiting_advance := false
+var _awaiting_restart := false
 var _missed_this_round := false
 var _solved := {}
 
@@ -50,7 +51,8 @@ func start() -> void:
     _total = _queue.size()
     _index = -1
     _score = 0
-    _answered = false
+    _awaiting_advance = false
+    _awaiting_restart = false
     _missed_this_round = false
     _solved = {}
     _advance()
@@ -82,7 +84,11 @@ func total() -> int:
 
 
 func _on_state_clicked(state_code: String) -> void:
-    if _answered or _index < 0 or _index >= _queue.size():
+    # While waiting to advance/restart, state clicks are ignored here; any click
+    # (including empty space) advances via continue_game(), driven by main.gd.
+    if _awaiting_advance or _awaiting_restart:
+        return
+    if _index < 0 or _index >= _queue.size():
         return
     var prompt: Dictionary = _queue[_index]
     var correct: bool = state_code == String(prompt["code"])
@@ -93,23 +99,35 @@ func _on_state_clicked(state_code: String) -> void:
         if not _missed_this_round and not _solved.has(String(prompt["code"])):
             _solved[String(prompt["code"])] = true
             _score += 1
-        _answered = true
+        # Resolved: the next click anywhere advances to the next prompt.
+        _awaiting_advance = true
     else:
         # Wrong guess: give feedback but stay on this state — do NOT lock or advance.
         _missed_this_round = true
     EventBus.answer_resolved.emit(state_code, correct)
 
 
-## Called by the UI (after showing feedback) to move to the next prompt.
-func next() -> void:
-    _advance()
+## True when a correct answer or game-over is latched, waiting for any click.
+func is_waiting() -> bool:
+    return _awaiting_advance or _awaiting_restart
+
+
+## Consume the "any click" that advances to the next prompt (or restarts after
+## game over). Called by main.gd for clicks anywhere, including empty space.
+func continue_game() -> void:
+    if _awaiting_restart:
+        _awaiting_restart = false
+        start()
+    elif _awaiting_advance:
+        _awaiting_advance = false
+        _advance()
 
 
 func _advance() -> void:
     _index += 1
-    _answered = false
     _missed_this_round = false
     if _index >= _queue.size():
+        _awaiting_restart = true
         EventBus.game_over.emit(_score, _total)
         return
     EventBus.round_advanced.emit(_queue[_index]["code"])

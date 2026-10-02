@@ -52,14 +52,13 @@ const server = http.createServer((req, res) => {
   const canvas = await page.$("canvas");
   if (canvas) {
     const box = await canvas.boundingBox();
-    // States mode: click Texas-ish area to show the on-map state name label.
-    await page.mouse.click(box.x + box.width * 0.46, box.y + box.height * 0.68);
-    await page.waitForTimeout(1000);
+    // Screenshot the initial prompt (verifies "State: X" format, no Next button).
     await page.screenshot({ path: "/project/browser_states.png" });
-    // Switch to capitals mode (top-left Mode button), then click to show a capital label.
+    // Toggle to capitals mode via the Mode button to verify "Capital: X".
     await page.mouse.click(box.x + box.width * 0.078, box.y + box.height * 0.044);
     await page.waitForTimeout(1200);
     await page.screenshot({ path: "/project/browser_capitals.png" });
+    // Click a state to show the on-map label + feedback.
     await page.mouse.click(box.x + box.width * 0.46, box.y + box.height * 0.68);
     await page.waitForTimeout(1000);
     await page.screenshot({ path: "/project/browser_click.png" });

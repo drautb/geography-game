@@ -1,15 +1,13 @@
 extends CanvasLayer
-## Game HUD for "find the state": prompt, score, feedback, and a Next control.
-## Purely presentational — reads EventBus signals and tells the GameManager to
-## advance. Built in code (no .tscn) to keep the UI versioned as a single script.
+## Game HUD: prompt, score, feedback, and a mode toggle. Purely presentational —
+## reads EventBus signals. There is no Next button: after a correct answer any
+## click advances, and after game over any click restarts (handled in GameManager).
 
-signal next_requested
 signal mode_toggled(capital_mode: bool)
 
 var _prompt_label: Label
 var _score_label: Label
 var _feedback_label: Label
-var _next_button: Button
 var _mode_button: Button
 
 var _prompt_name := ""
@@ -48,20 +46,6 @@ func _ready() -> void:
     _feedback_label.offset_bottom = 90
     add_child(_feedback_label)
 
-    _next_button = Button.new()
-    _next_button.text = "Next"
-    _next_button.anchor_left = 0.5
-    _next_button.anchor_right = 0.5
-    _next_button.anchor_top = 1.0
-    _next_button.anchor_bottom = 1.0
-    _next_button.offset_left = -50
-    _next_button.offset_right = 50
-    _next_button.offset_top = -56
-    _next_button.offset_bottom = -20
-    _next_button.visible = false
-    _next_button.pressed.connect(_on_next_pressed)
-    add_child(_next_button)
-
     _mode_button = Button.new()
     _mode_button.text = "Mode: States"
     _mode_button.offset_left = 20
@@ -76,17 +60,16 @@ func _ready() -> void:
     EventBus.game_over.connect(_on_game_over)
 
 
-## main.gd supplies the display label for each prompt (state name, or capital in
-## capitals mode). The instruction prefix reflects the current mode.
+## main.gd supplies the display label; the prefix reflects the current mode.
 func set_prompt_name(label: String) -> void:
     _prompt_name = label
     if _capital_mode:
-        _prompt_label.text = "Which state's capital is %s?" % label
+        _prompt_label.text = "Capital: %s" % label
     else:
-        _prompt_label.text = "Find: %s" % label
+        _prompt_label.text = "State: %s" % label
 
 
-## Supply the code -> full name map so wrong-answer feedback can name the clicked state.
+## Supply the code -> full name map (available for feedback if needed).
 func set_name_lookup(lookup: Dictionary) -> void:
     _name_by_code = lookup
 
@@ -103,33 +86,22 @@ func set_score(score: int, total: int) -> void:
 
 func _on_round_advanced(_code: String) -> void:
     _feedback_label.text = ""
-    _next_button.visible = false
 
 
-func _on_answer_resolved(code: String, correct: bool) -> void:
+func _on_answer_resolved(_code: String, correct: bool) -> void:
     if correct:
-        _feedback_label.text = "Correct!"
+        _feedback_label.text = "Correct! Click anywhere to continue"
         _feedback_label.add_theme_color_override("font_color", Color(0.4, 0.85, 0.45))
-        _next_button.visible = true
     else:
-        # Wrong guess: name what they clicked and invite another try. The round
-        # stays open, so no Next button yet. The clicked state's name is shown on
-        # the map itself, so the top status stays short.
+        # Round stays open; the clicked state's name is shown on the map itself.
         _feedback_label.text = "Keep looking"
         _feedback_label.add_theme_color_override("font_color", Color(0.9, 0.5, 0.45))
 
 
 func _on_game_over(score: int, total: int) -> void:
     _prompt_label.text = "Done!"
-    _feedback_label.text = "Final score: %d / %d" % [score, total]
+    _feedback_label.text = "Final score: %d / %d — click anywhere to play again" % [score, total]
     _feedback_label.add_theme_color_override("font_color", Color(0.95, 0.9, 0.6))
-    _next_button.text = "Play again"
-    _next_button.visible = true
-
-
-func _on_next_pressed() -> void:
-    _next_button.text = "Next"
-    next_requested.emit()
 
 
 func _on_mode_pressed() -> void:

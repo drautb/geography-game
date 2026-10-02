@@ -33,10 +33,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
     _frames += 1
-    # Each frame: answer the current prompt correctly, then advance, until game over.
+    # Each frame: answer the current prompt correctly, then advance via the
+    # any-click continue path, until game over.
     if _frames >= 2 and not _over:
         EventBus.state_clicked.emit(_prompt_code)
-        _game.next()
+        _game.continue_game()
     if _over and _frames > 2:
         # Let the UI paint the end screen, then capture.
         await get_tree().process_frame

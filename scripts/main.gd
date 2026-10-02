@@ -53,22 +53,23 @@ func _ready() -> void:
     _ui = GameUiScript.new()
     add_child(_ui)
     _ui.set_name_lookup(_name_by_code)
-    _ui.next_requested.connect(_on_next_requested)
     _ui.mode_toggled.connect(_on_mode_toggled)
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
-    EventBus.game_over.connect(_on_game_over)
 
     _game = GameManagerScript.new(states, capitals)
     _game.start()
 
 
-var _is_over := false
-
-
-func _on_game_over(_score: int, _total: int) -> void:
-    _is_over = true
+## Any left-click advances when the game is waiting (after a correct answer or
+## game over). State clicks while playing are handled by the Area2D -> state_clicked
+## path; this only acts on the "click anywhere to continue" states.
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton:
+        var mb := event as InputEventMouseButton
+        if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _game.is_waiting():
+            _game.continue_game()
 
 
 func _on_round_advanced(code: String) -> void:
@@ -152,19 +153,9 @@ func _clear_labels() -> void:
         child.queue_free()
 
 
-func _on_next_requested() -> void:
-    if _is_over:
-        _is_over = false
-        _reset_all_fills()
-        _game.start()
-    else:
-        _game.next()
-
-
 func _on_mode_toggled(capital_mode: bool) -> void:
     _capital_mode = capital_mode
     _pins.visible = capital_mode
-    _is_over = false
     _reset_all_fills()
     _game.set_mode(GameManagerScript.Mode.CAPITAL if capital_mode else GameManagerScript.Mode.STATE)
     _game.start()
