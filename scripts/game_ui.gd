@@ -5,6 +5,7 @@ extends CanvasLayer
 
 signal mode_toggled(capital_mode: bool)
 signal regions_changed(enabled: Dictionary)
+signal show_names_toggled(show: bool)
 
 const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const REGIONS := ["Northeast", "Midwest", "South", "West"]
@@ -15,6 +16,7 @@ var _feedback_label: Label
 var _state_radio: CheckBox
 var _capital_radio: CheckBox
 var _region_checks := {}
+var _names_check: CheckBox
 
 var _prompt_name := ""
 var _name_by_code := {}
@@ -103,6 +105,15 @@ func _ready() -> void:
         col.add_child(row)
         _region_checks[region] = cb
 
+    col.add_child(HSeparator.new())
+
+    # Options section.
+    col.add_child(_section_title("Options"))
+    _names_check = CheckBox.new()
+    _names_check.text = "Show state names"
+    _names_check.toggled.connect(_on_names_toggled)
+    col.add_child(_names_check)
+
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
     EventBus.game_over.connect(_on_game_over)
@@ -164,6 +175,10 @@ func _on_capital_radio_toggled(pressed: bool) -> void:
     if pressed:
         _capital_mode = true
         mode_toggled.emit(true)
+
+
+func _on_names_toggled(pressed: bool) -> void:
+    show_names_toggled.emit(pressed)
 
 
 func _on_region_toggled(_pressed: bool) -> void:

@@ -24,6 +24,7 @@ var _last_answer_code := ""
 var _wrong_code := ""
 var _pins: Node2D
 var _labels: Node2D
+var _name_labels: Node2D
 var _capital_by_code := {}
 var _pin_pos := {}
 var _capital_mode := false
@@ -55,11 +56,16 @@ func _ready() -> void:
     _labels.name = "MapLabels"
     _map_root.add_child(_labels)
 
+    # Persistent state-name labels (optional, toggled via the UI).
+    _name_labels = MapBuilderScript.build_name_labels(_map_root, _map_root)
+    _name_labels.visible = false
+
     _ui = GameUiScript.new()
     add_child(_ui)
     _ui.set_name_lookup(_name_by_code)
     _ui.mode_toggled.connect(_on_mode_toggled)
     _ui.regions_changed.connect(_on_regions_changed)
+    _ui.show_names_toggled.connect(_on_show_names_toggled)
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
@@ -199,6 +205,10 @@ func _on_regions_changed(enabled: Dictionary) -> void:
     _reset_all_fills()
     _game.set_regions(enabled)
     _game.start()
+
+
+func _on_show_names_toggled(show: bool) -> void:
+    _name_labels.visible = show
 
 
 func _reset_all_fills() -> void:

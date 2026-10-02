@@ -44,6 +44,18 @@ static func region_color(region: String, enabled := true) -> Color:
 ## whole state (including multipolygon parts) by its postal code.
 const FILL_GROUP_PREFIX := "fill_"
 
+## Small, tightly-packed states labeled by postal code (full names overlap badly).
+const SMALL_STATES := {
+    "CT": true,
+    "DE": true,
+    "MA": true,
+    "MD": true,
+    "NH": true,
+    "NJ": true,
+    "RI": true,
+    "VT": true,
+}
+
 
 ## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
 static func set_fill(root: Node, state_code: String, color: Color) -> void:
@@ -136,6 +148,37 @@ static func build_capitals(parent: Node2D, geojson_path: String, t: Transform) -
     container.set_meta("pin_positions", pin_positions)
     parent.add_child(container)
     return container
+
+
+## Build a persistent name label for every state (at its label_pos anchor), under a
+## single container that can be shown/hidden. `state_areas` is the map root whose
+## Area2D children carry "state_name"/"state_code"/"label_pos" metadata.
+static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
+    var container := Node2D.new()
+    container.name = "StateNameLabels"
+    for child in state_areas.get_children():
+        if not (child is Area2D) or not child.has_meta("label_pos"):
+            continue
+        var code := String(child.get_meta("state_code"))
+        # Small, tightly-packed states (mostly the Northeast) are labeled by their
+        # postal code to avoid an unreadable pile-up; everyone else gets the name.
+        var text := code if SMALL_STATES.has(code) else String(child.get_meta("state_name"))
+        var pos: Vector2 = child.get_meta("label_pos")
+        container.add_child(_make_name_label(text, pos))
+    parent.add_child(container)
+    return container
+
+
+## A small outlined, centered state-name label for the persistent name layer.
+static func _make_name_label(text: String, pos: Vector2) -> Label:
+    var label := Label.new()
+    label.text = text
+    label.add_theme_font_size_override("font_size", 13)
+    label.add_theme_color_override("font_color", Color(1, 1, 1))
+    label.add_theme_color_override("font_outline_color", Color(0.1, 0.12, 0.16))
+    label.add_theme_constant_override("outline_size", 5)
+    label.position = pos - Vector2(text.length() * 3.3, 7)
+    return label
 
 
 ## A small star/dot capital marker: a filled circle with a thin dark outline.
