@@ -7,7 +7,7 @@ off the mid-Atlantic coast (same albersusa coordinate space), and records the
 original centroid so the game can draw a leader line from DC's true location to
 the enlarged callout.
 
-Run after tools/build_states.sh. Idempotent-ish: it keys off a marker property so
+Run after pipeline/make_areas.sh. Idempotent-ish: it keys off a marker property so
 re-running does not compound the transform.
 """
 import json

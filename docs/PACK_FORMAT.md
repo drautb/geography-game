@@ -12,7 +12,7 @@ packs/us-states/
   pack.json        manifest (this document)
   areas.geojson    the clickable regions (states / countries / continents)
   points.geojson   optional capital/city points (omit for an areas-only pack)
-  build.sh         the data pipeline that regenerates the GeoJSON (optional at runtime)
+  pipeline/        the data pipeline + raw source that regenerates the GeoJSON
 ```
 
 ## Coordinate space
@@ -21,7 +21,7 @@ Both GeoJSON files hold **flat, pre-projected planar coordinates** (Y-up), alrea
 through whatever projection suits the pack (`albersusa` for the US, something else for a
 world or regional pack). The engine never projects — it fits the bbox to the viewport with
 a uniform scale and a Y-flip. **Projection is a per-pack build-time choice**, so a pack's
-`build.sh` owns it and the engine stays generic.
+`pipeline/` owns it and the engine stays generic.
 
 `areas.geojson` features carry these properties:
 

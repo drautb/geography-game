@@ -3,7 +3,7 @@
 
 The four standard U.S. Census Bureau regions (Northeast, Midwest, South, West).
 DC is placed in the South, consistent with Census practice. Run after
-tools/build_states.sh (and inset_dc.py); idempotent.
+pipeline/make_areas.sh (and inset_dc.py); idempotent.
 """
 import json
 import sys

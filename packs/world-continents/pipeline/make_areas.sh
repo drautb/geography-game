@@ -14,7 +14,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-RAW="build/raw/ne_110m_admin_0_countries.shp"
+RAW="pipeline/raw/ne_110m_admin_0_countries.shp"
 OUT="areas.geojson"
 
 # CONTINENT -> short code lookup, applied in a mapshaper -each expression.

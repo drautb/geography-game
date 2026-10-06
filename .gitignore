@@ -17,7 +17,7 @@ test_frame.wav.import
 core.*
 
 # Large intermediate data (the raw Census zip; keep extracted source + final build)
-packs/*/build/raw/*.zip
+packs/*/pipeline/raw/*.zip
 
 # Godot auto-generates .translation from CSVs; we keep CSVs as plain data (importer=keep)
 *.translation
@@ -33,5 +33,5 @@ browser_states.png
 browser_states.png.import
 
 # A global ~/.gitignore "build" pattern would drop pack build pipelines; keep them.
-!packs/*/build/
-!packs/*/build/**
+!packs/*/pipeline/
+!packs/*/pipeline/**
