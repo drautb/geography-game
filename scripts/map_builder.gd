@@ -147,19 +147,17 @@ static func build_name_labels(parent: Node2D, area_root: Node, pack) -> Node2D:
     return container
 
 
-## Draw one leader-line callout: the full-name label near label_pos, and a thin
-## line from the area anchor to the nearest point on the label's box. The label's
-## x is clamped so a wide name never runs off the right edge of the viewport.
+## Draw one leader-line callout: the full-name label CENTERED on label_pos (the
+## callout point), and a thin line from the area anchor to the nearest point on
+## the label's box. The callout point is authoritative — no clamping — so a
+## position set in the label editor renders identically here (WYSIWYG).
 static func _draw_callout(
     container: Node2D, anchor: Vector2, label_pos: Vector2, name_str: String
 ) -> void:
-    var box_size := Vector2(name_str.length() * 7.0, 18.0)
-    var x := minf(label_pos.x, DESIGN_WIDTH - 8.0 - box_size.x)
-    x = maxf(x, 8.0)
-    var pos := Vector2(x, label_pos.y)
-    var label := _make_name_label(name_str, pos)
-    label.position = pos
-    var attach := _nearest_point_on_box(pos, pos + box_size, anchor)
+    var box_size := label_box_size(name_str)
+    var top_left := label_pos - box_size * 0.5
+    var label := _make_name_label(name_str, label_pos)
+    var attach := _nearest_point_on_box(top_left, top_left + box_size, anchor)
     var line := Line2D.new()
     line.points = PackedVector2Array([anchor, attach])
     line.width = 1.0
@@ -169,20 +167,27 @@ static func _draw_callout(
     container.add_child(label)
 
 
+## Shared label box estimate (font size 13). Used by both the game and the label
+## editor so a callout point means the same thing in both.
+static func label_box_size(text: String) -> Vector2:
+    return Vector2(text.length() * 7.0, 18.0)
+
+
 ## Point on the axis-aligned box [tl, br] nearest to p (p clamped to the box edge).
 static func _nearest_point_on_box(tl: Vector2, br: Vector2, p: Vector2) -> Vector2:
     return Vector2(clampf(p.x, tl.x, br.x), clampf(p.y, tl.y, br.y))
 
 
-## A small outlined, centered area-name label for the persistent name layer.
-static func _make_name_label(text: String, pos: Vector2) -> Label:
+## A name label CENTERED on `center`, using the shared box estimate so its center
+## is exactly `center` (matching the editor's chip center).
+static func _make_name_label(text: String, center: Vector2) -> Label:
     var label := Label.new()
     label.text = text
     label.add_theme_font_size_override("font_size", 13)
     label.add_theme_color_override("font_color", Color(1, 1, 1))
     label.add_theme_color_override("font_outline_color", Color(0.1, 0.12, 0.16))
     label.add_theme_constant_override("outline_size", 5)
-    label.position = pos - Vector2(text.length() * 3.3, 7)
+    label.position = center - label_box_size(text) * 0.5
     return label
 
 

@@ -146,8 +146,10 @@ func _to_world(screen: Vector2) -> Vector2:
 ## top. The chip's background changes on hover and while grabbed, cueing that it is
 ## draggable. `pos` is the chip's visual center.
 func _make_label(code: String, text: String, pos: Vector2) -> Control:
+    # Chip's text region uses the SAME box estimate the game uses, so the chip
+    # center (what we save as the callout) maps to the game's label center exactly.
     var pad := Vector2(10, 4)
-    var text_size := Vector2(text.length() * 7.0, 16.0)
+    var text_size: Vector2 = MapBuilderScript.label_box_size(text)
     var chip := Panel.new()
     chip.custom_minimum_size = text_size + pad * 2.0
     chip.size = chip.custom_minimum_size
