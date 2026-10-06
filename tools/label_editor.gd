@@ -316,15 +316,19 @@ func _reset_moved() -> void:
     _set_status("reset — all labels back to auto position")
 
 
-## Write the moved labels as the pack's "callouts", preserving other fields.
+## Write the moved labels as the pack's "callouts", preserving other fields. Writes
+## to the real OS path (not res://) and then re-reads it to confirm the change
+## actually landed — because when this tool runs INSIDE the Godot editor, the
+## editor owns pack.json and can clobber a write made by the running game. If the
+## verify fails, the status says so instead of silently reporting success.
 func _save() -> void:
     if _pack == null:
         return
     var disk_path := ProjectSettings.globalize_path(_pack.dir + "/pack.json")
-    var text := FileAccess.get_file_as_string(_pack.dir + "/pack.json")
+    var text := FileAccess.get_file_as_string(disk_path)
     var manifest = JSON.parse_string(text)
     if typeof(manifest) != TYPE_DICTIONARY:
-        _set_status("ERROR: could not read manifest")
+        _set_status("ERROR: could not read %s" % disk_path)
         return
 
     var callouts := {}
@@ -342,7 +346,19 @@ func _save() -> void:
         return
     f.store_string(JSON.stringify(manifest, "  "))
     f.close()
-    _set_status("saved %d callouts -> %s" % [callouts.size(), disk_path])
+
+    # Verify the write actually persisted (re-read from the OS path).
+    var check = JSON.parse_string(FileAccess.get_file_as_string(disk_path))
+    var ok: bool = (
+        typeof(check) == TYPE_DICTIONARY and check.get("callouts", {}).size() == callouts.size()
+    )
+    if not ok:
+        _set_status("WARNING: wrote but verify failed — check %s" % disk_path)
+        return
+    var note := ""
+    if OS.has_feature("editor"):
+        note = "  (editor may need a FileSystem rescan to see it)"
+    _set_status("saved %d callouts -> %s%s" % [callouts.size(), disk_path, note])
 
 
 func _set_status(msg: String) -> void:

@@ -55,6 +55,17 @@ the moved labels into that pack's
 picks them up automatically. **Reset dragged** returns all labels to auto position.
 Requires a real display — run on a desktop Godot, not the headless Docker setup.
 
+**Important — editor cache gotcha:** if you run this tool *from inside the Godot editor*
+(play button), the editor owns `pack.json` and can overwrite the tool's save with its own
+cached copy, so your changes appear to vanish. After saving, do one of:
+either **run the tool standalone** instead (`Godot_...x86_64 --path . tools/label_editor.tscn`
+from a terminal, no editor open), which has no cache to fight; or, if you must run it in
+the editor, after Save trigger **Project → Tools → or just focus the FileSystem dock and
+let it reimport**, then confirm `pack.json` on disk shows your values before closing. The
+tool verifies its own write and warns in the status bar when run under the editor. The
+game reads `callouts` live from `pack.json`, so once the file truly has them, re-running
+`main.tscn` (or re-exporting the WASM) applies them.
+
 ## Data pipeline
 
 Each map pack owns its data pipeline under `packs/<pack>/pipeline/`. For the US pack,
