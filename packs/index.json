@@ -19,6 +19,14 @@
     {
       "id": "europe",
       "name": "Europe"
+    },
+    {
+      "id": "asia",
+      "name": "Asia"
+    },
+    {
+      "id": "north-america",
+      "name": "North America"
     }
   ]
 }
