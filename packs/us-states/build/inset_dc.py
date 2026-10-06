@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-GEOJSON = Path(__file__).resolve().parent.parent / "data/us_states.geojson"
+GEOJSON = Path(__file__).resolve().parent.parent / "areas.geojson"
 
 SCALE = 8.0
 # Target centroid for the callout: east of the coastline, near DC's latitude.

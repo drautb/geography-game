@@ -36,12 +36,14 @@ The binary and `*.zip`/`*.tpz` are gitignored — re-download on a fresh checkou
 
 ## Data pipeline
 
-Regenerate the projected map/capital GeoJSON from the raw Census data. Requires `npx`
-(mapshaper is fetched on demand, no global install):
+Each map pack owns its data pipeline under `packs/<pack>/build/`. For the US pack,
+regenerate the projected GeoJSON from the raw Census data (requires `npx`; mapshaper is
+fetched on demand):
 
 ```bash
-bash tools/build_states.sh     # -> data/us_states.geojson
-bash tools/build_capitals.sh   # -> data/capitals.geojson
+cd packs/us-states
+bash build/build_states.sh     # -> packs/us-states/areas.geojson
+bash build/build_capitals.sh   # -> packs/us-states/capitals.geojson
 ```
 
 Both use mapshaper's `albersusa` composite projection (Albers lower-48 + Alaska inset +

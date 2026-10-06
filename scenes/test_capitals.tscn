@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b0geogtestcapitals"]
-
-[ext_resource type="Script" path="res://scenes/test_capitals.gd" id="1"]
-
-[node name="TestCapitals" type="Node2D"]
-script = ExtResource("1")

@@ -16,8 +16,8 @@ test_frame.wav
 test_frame.wav.import
 core.*
 
-# Large intermediate data (keep raw source + final build, drop scratch)
-data/raw/*.zip
+# Large intermediate data (the raw Census zip; keep extracted source + final build)
+packs/*/build/raw/*.zip
 
 # Godot auto-generates .translation from CSVs; we keep CSVs as plain data (importer=keep)
 *.translation

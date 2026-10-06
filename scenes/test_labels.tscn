@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b0geogtestlabels"]
-
-[ext_resource type="Script" path="res://scenes/test_labels.gd" id="1"]
-
-[node name="TestLabels" type="Node"]
-script = ExtResource("1")

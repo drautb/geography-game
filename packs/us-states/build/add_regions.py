@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-GEOJSON = Path(__file__).resolve().parent.parent / "data/us_states.geojson"
+GEOJSON = Path(__file__).resolve().parent.parent / "areas.geojson"
 
 # Postal code -> Census region.
 REGION = {
@@ -42,7 +42,7 @@ def main() -> int:
         if region is None:
             missing.append(code)
             continue
-        f["properties"]["region"] = region
+        f["properties"]["group"] = region
     if missing:
         print("No region mapping for: %s" % ", ".join(missing), file=sys.stderr)
         return 1

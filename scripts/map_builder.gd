@@ -1,18 +1,18 @@
 extends RefCounted
 class_name MapBuilder
-## Builds the interactive US map node tree from a projected GeoJSON file.
+## Builds the interactive map node tree from a pack's projected areas GeoJSON.
 ##
-## The GeoJSON (data/us_states.geojson) holds albersusa-projected planar
-## coordinates in meters, Y-up. We fit them to a target pixel rectangle with a
-## uniform scale and a Y-flip (Godot is Y-down), preserving aspect ratio.
+## Pack-agnostic: colors, groups, and callout overrides all come from the loaded
+## Pack (see docs/PACK_FORMAT.md), not from constants here. The GeoJSON holds flat
+## pre-projected planar coordinates (Y-up); we fit the bbox to a target rectangle
+## with a uniform scale and a Y-flip (Godot is Y-down), preserving aspect ratio.
 ##
-## For each state we build:
-##   Area2D (named by postal code, holds "state_code"/"state_name" metadata)
+## For each area we build:
+##   Area2D (named by code, holds "code"/"name"/"group"/"label_pos" metadata)
 ##   ├── Polygon2D       (fill, one per geometry part)
 ##   ├── Line2D          (border outline, one per ring)
 ##   └── CollisionPolygon2D (hit region, one per geometry part)
 
-const FILL_COLOR := Color(0.42, 0.55, 0.68)
 const FILL_CORRECT := Color(0.36, 0.72, 0.42)
 const FILL_WRONG := Color(0.82, 0.36, 0.33)
 const FILL_HIGHLIGHT := Color(0.95, 0.78, 0.35)
@@ -21,61 +21,32 @@ const BORDER_WIDTH := 1.5
 const CAPITAL_COLOR := Color(0.98, 0.85, 0.4)
 const CAPITAL_RING := Color(0.2, 0.16, 0.1)
 
-## Base fill color per Census region.
-const REGION_COLORS := {
-    "Northeast": Color(0.42, 0.55, 0.72),
-    "Midwest": Color(0.46, 0.66, 0.56),
-    "South": Color(0.76, 0.62, 0.44),
-    "West": Color(0.66, 0.5, 0.66),
-}
-
-
-## The base fill for a region, dimmed (desaturated + darkened) when disabled.
-static func region_color(region: String, enabled := true) -> Color:
-    var c: Color = REGION_COLORS.get(region, FILL_COLOR)
-    if enabled:
-        return c
-    # Dim: pull toward the dark background and desaturate.
-    var dim := c.lerp(Color(0.16, 0.19, 0.24), 0.68)
-    return Color(dim.r, dim.g, dim.b, 1.0)
-
-
-## Group name applied to every state's fill polygons, so set_fill() can recolor a
-## whole state (including multipolygon parts) by its postal code.
+## Group name applied to every area's fill polygons, so set_fill() can recolor a
+## whole area (including multipolygon parts) by its code.
 const FILL_GROUP_PREFIX := "fill_"
 
-## Small, tightly-packed states labeled by leader-line callout (names overlap badly).
-const SMALL_STATES := {
-    "CT": true,
-    "DE": true,
-    "MA": true,
-    "MD": true,
-    "NH": true,
-    "NJ": true,
-    "RI": true,
-    "VT": true,
-}
+## Design width used to keep callout labels on screen.
+const DESIGN_WIDTH := 1280.0
 
 
-## Recolor every fill polygon belonging to `state_code` within `root`'s tree.
-static func set_fill(root: Node, state_code: String, color: Color) -> void:
-    root.get_tree().call_group(FILL_GROUP_PREFIX + state_code, "set_color", color)
+## Recolor every fill polygon belonging to `code` within `root`'s tree.
+static func set_fill(root: Node, code: String, color: Color) -> void:
+    root.get_tree().call_group(FILL_GROUP_PREFIX + code, "set_color", color)
 
 
-## Reset every state under `map_root` to its region base color, dimming states
-## whose region is not enabled. `enabled_regions` is a {region: true} set; an empty
-## set means all regions are enabled.
-static func apply_region_colors(map_root: Node, enabled_regions: Dictionary) -> void:
+## Reset every area under `map_root` to its group base color, dimming areas whose
+## group is not enabled. `enabled_groups` is a {group: true} set; empty means all.
+static func apply_group_colors(map_root: Node, pack, enabled_groups: Dictionary) -> void:
     for child in map_root.get_children():
-        if not (child is Area2D) or not child.has_meta("region"):
+        if not (child is Area2D) or not child.has_meta("group"):
             continue
-        var region := String(child.get_meta("region"))
-        var on: bool = enabled_regions.is_empty() or enabled_regions.get(region, false)
-        set_fill(map_root, String(child.name), region_color(region, on))
+        var group := String(child.get_meta("group"))
+        var on: bool = enabled_groups.is_empty() or enabled_groups.get(group, false)
+        set_fill(map_root, String(child.name), pack.group_color(group, on))
 
 
-## Read the list of {code, name} for every feature in a GeoJSON file.
-static func load_state_list(geojson_path: String) -> Array:
+## Read the list of {code, name, group} for every feature in an areas GeoJSON.
+static func load_area_list(geojson_path: String) -> Array:
     var out: Array = []
     var text := FileAccess.get_file_as_string(geojson_path)
     if text.is_empty():
@@ -90,14 +61,14 @@ static func load_state_list(geojson_path: String) -> Array:
             {
                 "code": props.get("code", ""),
                 "name": props.get("name", ""),
-                "region": props.get("region", "")
+                "group": props.get("group", "")
             }
         )
     return out
 
 
-## Read the capitals list as [{code, name, capital}] from a capitals GeoJSON.
-static func load_capital_list(geojson_path: String) -> Array:
+## Read the points list as [{code, name, capital}] from a points GeoJSON.
+static func load_point_list(geojson_path: String) -> Array:
     var out: Array = []
     var text := FileAccess.get_file_as_string(geojson_path)
     if text.is_empty():
@@ -118,13 +89,12 @@ static func load_capital_list(geojson_path: String) -> Array:
     return out
 
 
-## Draw a dot marker for each capital under `parent`, using the SAME transform the
-## states were built with (so pins land on the map). Pins are plain Node2D visuals
-## with no Area2D, so clicks pass through to the state beneath. Returns the pin
-## container so it can be shown/hidden per game mode.
-static func build_capitals(parent: Node2D, geojson_path: String, t: Transform) -> Node2D:
+## Draw a dot marker for each point under `parent`, using the SAME transform the
+## areas were built with. Pins are plain Node2D visuals with no Area2D, so clicks
+## pass through to the area beneath. Returns the pin container (toggleable).
+static func build_points(parent: Node2D, geojson_path: String, t: Transform) -> Node2D:
     var container := Node2D.new()
-    container.name = "CapitalPins"
+    container.name = "PointPins"
     var text := FileAccess.get_file_as_string(geojson_path)
     if text.is_empty():
         push_error("MapBuilder: could not read %s" % geojson_path)
@@ -144,89 +114,39 @@ static func build_capitals(parent: Node2D, geojson_path: String, t: Transform) -
         var code := String(feature.get("properties", {}).get("code", ""))
         pin_positions[code] = pos
         container.add_child(_make_pin(pos))
-    # Expose code -> pin screen position so the game can place capital labels.
     container.set_meta("pin_positions", pin_positions)
     parent.add_child(container)
     return container
 
 
-## Build a persistent name label for every state, under a single toggleable
-## container. Most states get a centered label at their anchor; the small,
-## tightly-packed Northeast states get a full-name callout in a column off the
-## east coast, each with a leader line back to the state.
-static func build_name_labels(parent: Node2D, state_areas: Node) -> Node2D:
+## Build a persistent name label for every area, under a single toggleable
+## container. Areas listed in the pack's callouts get a leader-line callout at the
+## pack-specified position; everyone else gets a centered on-map label.
+static func build_name_labels(parent: Node2D, area_root: Node, pack) -> Node2D:
     var container := Node2D.new()
-    container.name = "StateNameLabels"
-
-    var small: Array = []  # [{code, name, anchor}] for callout states
-    for child in state_areas.get_children():
+    container.name = "AreaNameLabels"
+    for child in area_root.get_children():
         if not (child is Area2D) or not child.has_meta("label_pos"):
             continue
-        var code := String(child.get_meta("state_code"))
-        var name_str := String(child.get_meta("state_name"))
-        var pos: Vector2 = child.get_meta("label_pos")
-        if SMALL_STATES.has(code):
-            small.append({"code": code, "name": name_str, "anchor": pos})
+        var code := String(child.get_meta("code"))
+        var name_str := String(child.get_meta("name"))
+        var anchor: Vector2 = child.get_meta("label_pos")
+        if pack.callouts.has(code):
+            _draw_callout(container, anchor, pack.callouts[code], name_str)
         else:
-            container.add_child(_make_name_label(name_str, pos))
-
-    _build_name_callouts(container, small)
+            container.add_child(_make_name_label(name_str, anchor))
     parent.add_child(container)
     return container
 
 
-## Lay small-state full-name labels as leader-line callouts. Northern New England
-## (VT, NH) is called out ABOVE the states (lines go up); the remaining coastal
-## states fan out in a staggered column to the right. Splitting the group this way
-## keeps the right column short and avoids long crossing diagonals.
-static func _build_name_callouts(container: Node2D, small: Array) -> void:
-    if small.is_empty():
-        return
-
-    # Explicit label position for each small, tightly-packed state, hand-tuned
-    # against the 1280x720 design layout to sit as close to its state as possible
-    # without overlapping other states, labels, or leader lines. The northern New
-    # England states fan across the open space above; the mid-Atlantic trio sits in
-    # the Atlantic to the right. States not listed fall back to a right column.
-    var fixed := {
-        "VT": Vector2(975, 72),
-        "NH": Vector2(1085, 55),
-        "MA": Vector2(1168, 150),
-        "RI": Vector2(1168, 192),
-        "CT": Vector2(1168, 228),
-        "NJ": Vector2(1168, 276),
-        "DE": Vector2(1168, 312),
-        "MD": Vector2(1120, 356),
-    }
-
-    var right_group: Array = []
-    for entry in small:
-        var code := String(entry["code"])
-        if fixed.has(code):
-            _draw_callout(container, entry["anchor"], fixed[code], String(entry["name"]))
-        else:
-            right_group.append(entry)
-
-    # Fallback for any small state not explicitly placed: a staggered right column.
-    right_group.sort_custom(func(a, b): return a["anchor"].y < b["anchor"].y)
-    var callout_x := 1190.0
-    var top := 150.0
-    var step := 26.0
-    for i in right_group.size():
-        var entry: Dictionary = right_group[i]
-        _draw_callout(container, entry["anchor"], Vector2(callout_x, top + step * i), entry["name"])
-
-
 ## Draw one leader-line callout: the full-name label near label_pos, and a thin
-## line from the state anchor to the nearest point on the label's box. The label's
+## line from the area anchor to the nearest point on the label's box. The label's
 ## x is clamped so a wide name never runs off the right edge of the viewport.
 static func _draw_callout(
     container: Node2D, anchor: Vector2, label_pos: Vector2, name_str: String
 ) -> void:
-    # Estimate the label's rendered box (font size 13 -> ~7px/char, ~18px tall).
     var box_size := Vector2(name_str.length() * 7.0, 18.0)
-    # Keep the whole label on screen (8px margin from the 1280-wide viewport).
-    var x := minf(label_pos.x, 1280.0 - 8.0 - box_size.x)
+    var x := minf(label_pos.x, DESIGN_WIDTH - 8.0 - box_size.x)
     x = maxf(x, 8.0)
     var pos := Vector2(x, label_pos.y)
     var label := _make_name_label(name_str, pos)
@@ -246,7 +166,7 @@ static func _nearest_point_on_box(tl: Vector2, br: Vector2, p: Vector2) -> Vecto
     return Vector2(clampf(p.x, tl.x, br.x), clampf(p.y, tl.y, br.y))
 
 
-## A small outlined, centered state-name label for the persistent name layer.
+## A small outlined, centered area-name label for the persistent name layer.
 static func _make_name_label(text: String, pos: Vector2) -> Label:
     var label := Label.new()
     label.text = text
@@ -314,19 +234,14 @@ static func _compute_transform(
 
     var span_x := max_x - min_x
     var span_y := max_y - min_y
-    # Guard against a degenerate target (e.g. a web canvas reporting size 0 before
-    # layout). Fall back to a sane default so geometry is never drawn off-screen.
     if target_size.x < 1.0 or target_size.y < 1.0:
         target_size = Vector2(1280, 720)
-    # The map lives in the region to the RIGHT of left_inset, with padding.
     var region := Vector2(target_size.x - left_inset, target_size.y)
     var avail := region - Vector2(padding, padding) * 2.0
     var scale := minf(avail.x / span_x, avail.y / span_y)
 
     var t := Transform.new()
     t.scale = scale
-    # Center the scaled map within the right-of-inset region. Y uses the flipped
-    # convention: geo max_y maps to the top (smallest screen Y).
     var drawn := Vector2(span_x, span_y) * scale
     var margin := (region - drawn) * 0.5
     t.offset = Vector2(left_inset + margin.x - min_x * scale, margin.y + max_y * scale)
@@ -354,37 +269,35 @@ static func _iter_parts(geom: Dictionary) -> Array:
     return []
 
 
-## Load the GeoJSON and build all state nodes under `parent`.
-## Returns the Transform used (so capitals can be placed in the same space).
-static func build(
-    parent: Node2D, geojson_path: String, target_size: Vector2, padding := 40.0, left_inset := 0.0
-) -> Transform:
-    var text := FileAccess.get_file_as_string(geojson_path)
+## Load the pack's areas GeoJSON and build all area nodes under `parent`.
+## Returns the Transform used (so points can be placed in the same space).
+static func build(parent: Node2D, pack, target_size: Vector2, padding := 40.0) -> Transform:
+    var text := FileAccess.get_file_as_string(pack.areas_path)
     if text.is_empty():
-        push_error("MapBuilder: could not read %s" % geojson_path)
+        push_error("MapBuilder: could not read %s" % pack.areas_path)
         return null
     var data = JSON.parse_string(text)
     if data == null or not data.has("features"):
-        push_error("MapBuilder: invalid GeoJSON at %s" % geojson_path)
+        push_error("MapBuilder: invalid GeoJSON at %s" % pack.areas_path)
         return null
 
     var features: Array = data["features"]
-    var t := _compute_transform(features, target_size, padding, left_inset)
+    var t := _compute_transform(features, target_size, padding, pack.left_inset)
 
     for feature in features:
         var geom = feature.get("geometry")
         if geom == null:
             continue
         var props: Dictionary = feature.get("properties", {})
-        # Draw a leader line from an inset state's true location to its callout,
-        # under the state fill so the polygon sits on top of the line's end.
+        # Draw a leader line from an inset area's true location to its callout,
+        # under the area fill so the polygon sits on top of the line's end.
         if props.has("origin") and props.has("callout"):
             _build_leader(parent, props["origin"], props["callout"], t)
-        _build_state(parent, geom, props, t)
+        _build_area(parent, geom, props, t, pack)
     return t
 
 
-## Thin dashed-looking leader from an inset state's true location to its callout.
+## Thin leader from an inset area's true location to its relocated callout.
 static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Transform) -> void:
     var line := Line2D.new()
     line.points = PackedVector2Array(
@@ -394,7 +307,6 @@ static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Tran
     line.default_color = Color(0.55, 0.62, 0.72, 0.8)
     line.antialiased = true
     parent.add_child(line)
-    # A small dot at the true location so the origin reads clearly.
     var dot := Line2D.new()
     var o := t.apply(origin[0], origin[1])
     dot.points = PackedVector2Array([o + Vector2(-2, 0), o + Vector2(2, 0)])
@@ -403,34 +315,32 @@ static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Tran
     parent.add_child(dot)
 
 
-static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform) -> void:
+static func _build_area(
+    parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform, pack
+) -> void:
     var code := String(props.get("code", "??"))
-    var region := String(props.get("region", ""))
+    var group := String(props.get("group", ""))
     var area := Area2D.new()
     area.name = code
-    area.set_meta("state_code", code)
-    area.set_meta("state_name", props.get("name", ""))
-    area.set_meta("region", region)
+    area.set_meta("code", code)
+    area.set_meta("name", props.get("name", ""))
+    area.set_meta("group", group)
     area.input_pickable = true
     area.input_event.connect(_on_area_input.bind(code))
 
-    var base_color := region_color(region, true)
+    var base_color: Color = pack.group_color(group, true)
     var best_anchor := Vector2.ZERO
     var best_area := -1.0
 
     for part in _iter_parts(geom):
-        # part = list of rings; ring 0 is the outer boundary, rest are holes.
         for ring_index in part.size():
             var ring: Array = part[ring_index]
             var points := PackedVector2Array()
             for p in ring:
                 points.append(t.apply(p[0], p[1]))
-            # GeoJSON rings repeat the first point as the last; drop it for Godot polys.
             if points.size() > 1 and points[0] == points[points.size() - 1]:
                 points.remove_at(points.size() - 1)
 
-            # Fill + collision only for the outer ring of each part (holes left simple
-            # for a kids' map; the 1:20m data has no meaningful interior holes).
             if ring_index == 0:
                 var fill := Polygon2D.new()
                 fill.polygon = points
@@ -442,14 +352,11 @@ static func _build_state(parent: Node2D, geom: Dictionary, props: Dictionary, t:
                 col.polygon = points
                 area.add_child(col)
 
-                # Track the largest part's centroid as the on-map label anchor, so a
-                # label lands on the main landmass rather than a small island.
                 var a := _ring_area(points)
                 if a > best_area:
                     best_area = a
                     best_anchor = _ring_centroid(points)
 
-            # Border outline for every ring (closed loop).
             var line := Line2D.new()
             var loop := points.duplicate()
             if loop.size() > 0:
@@ -497,11 +404,11 @@ static func _ring_centroid(pts: PackedVector2Array) -> Vector2:
     return Vector2(cx / (6.0 * a), cy / (6.0 * a))
 
 
-## Emit EventBus.state_clicked on a left-click release within a state's area.
+## Emit EventBus.area_clicked on a left-click release within an area.
 static func _on_area_input(
     _viewport: Node, event: InputEvent, _shape_idx: int, code: String
 ) -> void:
     if event is InputEventMouseButton:
         var mb := event as InputEventMouseButton
         if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
-            EventBus.state_clicked.emit(code)
+            EventBus.area_clicked.emit(code)

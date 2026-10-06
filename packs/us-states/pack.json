@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "United States",
+  "areas": "areas.geojson",
+  "points": "capitals.geojson",
+
+  "area_noun": "State",
+  "point_noun": "Capital",
+  "group_noun": "Regions",
+
+  "left_inset": 120,
+
+  "groups": [
+    { "id": "Northeast", "name": "Northeast", "color": "#6b8cb8" },
+    { "id": "Midwest",   "name": "Midwest",   "color": "#75a88f" },
+    { "id": "South",     "name": "South",     "color": "#c29e70" },
+    { "id": "West",      "name": "West",      "color": "#a880a8" }
+  ],
+
+  "callouts": {
+    "VT": [975, 72],
+    "NH": [1085, 55],
+    "MA": [1168, 150],
+    "RI": [1168, 192],
+    "CT": [1168, 228],
+    "NJ": [1168, 276],
+    "DE": [1168, 312],
+    "MD": [1120, 356]
+  }
+}

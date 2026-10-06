@@ -16,8 +16,8 @@ func _process(_delta: float) -> void:
     _frames += 1
     if _frames == 4:
         var ui = _main._ui
-        # Switch to capitals mode and turn on state names via the real signals.
-        ui._capital_radio.button_pressed = true
+        # Switch to points (capitals) mode and turn on area names via the real signals.
+        ui._points_radio.button_pressed = true
         ui._names_check.button_pressed = true
     if _frames == 8:
         var image := get_viewport().get_texture().get_image()

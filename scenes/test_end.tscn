@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b0geogtestend"]
-
-[ext_resource type="Script" path="res://scenes/test_end.gd" id="1"]
-
-[node name="TestEnd" type="Node2D"]
-script = ExtResource("1")
