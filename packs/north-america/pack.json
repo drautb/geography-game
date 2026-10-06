@@ -1,11 +1,87 @@
 {
-  "schema": 1,
-  "name": "North America",
-  "areas": "areas.geojson",
-  "points": "points.geojson",
-
   "area_noun": "Country",
+  "areas": "areas.geojson",
+  "callouts": {
+    "ATG": [
+      1118.0,
+      520.0
+    ],
+    "BHS": [
+      927.0,
+      485.0
+    ],
+    "BLZ": [
+      885.0,
+      591.0
+    ],
+    "CRI": [
+      852.0,
+      703.0
+    ],
+    "CUB": [
+      838.0,
+      537.0
+    ],
+    "DMA": [
+      1115.0,
+      554.0
+    ],
+    "DOM": [
+      1028.0,
+      441.0
+    ],
+    "GRD": [
+      1162.0,
+      648.0
+    ],
+    "GTM": [
+      738.0,
+      645.0
+    ],
+    "HND": [
+      881.0,
+      650.0
+    ],
+    "HTI": [
+      958.0,
+      530.0
+    ],
+    "JAM": [
+      934.0,
+      607.0
+    ],
+    "KNA": [
+      1077.0,
+      485.0
+    ],
+    "LCA": [
+      1060.0,
+      669.0
+    ],
+    "NIC": [
+      770.0,
+      679.0
+    ],
+    "PAN": [
+      949.0,
+      701.0
+    ],
+    "SLV": [
+      771.0,
+      658.0
+    ],
+    "TTO": [
+      1119.0,
+      688.0
+    ],
+    "VCT": [
+      1220.0,
+      583.0
+    ]
+  },
+  "left_inset": 120.0,
+  "name": "North America",
   "point_noun": "Capital",
-
-  "left_inset": 120
+  "points": "points.geojson",
+  "schema": 1.0
 }

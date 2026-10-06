@@ -1,13 +1,13 @@
 {
-  "schema": 1,
-  "name": "World — Continents",
-  "areas": "areas.geojson",
-
   "area_noun": "Continent",
-
-  "left_inset": 0,
-
+  "areas": "areas.geojson",
   "callouts": {
-    "EU": [690, 60]
-  }
+    "EU": [
+      816.0,
+      110.0
+    ]
+  },
+  "left_inset": 0.0,
+  "name": "World — Continents",
+  "schema": 1.0
 }

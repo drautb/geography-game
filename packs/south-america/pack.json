@@ -1,11 +1,39 @@
 {
-  "schema": 1,
-  "name": "South America",
-  "areas": "areas.geojson",
-  "points": "points.geojson",
-
   "area_noun": "Country",
+  "areas": "areas.geojson",
+  "callouts": {
+    "ARG": [
+      699.0,
+      438.0
+    ],
+    "CHL": [
+      590.0,
+      476.0
+    ],
+    "ECU": [
+      492.0,
+      144.0
+    ],
+    "GUY": [
+      775.0,
+      72.0
+    ],
+    "SUR": [
+      829.0,
+      100.0
+    ],
+    "URY": [
+      822.0,
+      501.0
+    ],
+    "VEN": [
+      673.0,
+      71.0
+    ]
+  },
+  "left_inset": 120.0,
+  "name": "South America",
   "point_noun": "Capital",
-
-  "left_inset": 120
+  "points": "points.geojson",
+  "schema": 1.0
 }
