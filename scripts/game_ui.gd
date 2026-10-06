@@ -63,6 +63,9 @@ func _ready() -> void:
 ## Top-left panel: mode radios (only when the pack has points) + group checkboxes
 ## with a color-swatch legend (only when the pack has groups).
 func _build_control_panel() -> void:
+    # Nothing to show if the pack has neither a points mode nor groups.
+    if not pack.has_points() and not pack.has_groups():
+        return
     var panel := PanelContainer.new()
     panel.position = Vector2(16, 14)
     panel.add_theme_stylebox_override("panel", _panel_style())
