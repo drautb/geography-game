@@ -34,6 +34,25 @@ cp /tmp/godot_templates_472/templates/web* ~/.local/share/godot/export_templates
 
 The binary and `*.zip`/`*.tpz` are gitignored — re-download on a fresh checkout.
 
+## Label editor (desktop tool)
+
+`tools/label_editor.tscn` is a desktop-only editor for tuning on-map label positions
+in crowded packs (not shipped in the WASM game). It renders a pack's map and overlays
+a draggable name label per area. Drag a label to give that area a leader-line callout;
+only the labels you move are written.
+
+Run it in the Godot editor (open the scene and play it) or via CLI:
+
+```bash
+./Godot_v4.7.2-stable_linux.x86_64 --path . tools/label_editor.tscn
+```
+
+Pick a pack from the top-left dropdown, drag the crowded labels apart, then click
+**Save callouts** (or Ctrl+S). Save writes the moved labels into that pack's
+`pack.json` `"callouts"` block (preserving every other field), so a later WASM rebuild
+picks them up automatically. **Reset dragged** returns all labels to auto position.
+Requires a real display — run on a desktop Godot, not the headless Docker setup.
+
 ## Data pipeline
 
 Each map pack owns its data pipeline under `packs/<pack>/pipeline/`. For the US pack,
