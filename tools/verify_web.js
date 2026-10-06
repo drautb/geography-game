@@ -44,23 +44,23 @@ const server = http.createServer((req, res) => {
   // Give the WASM runtime time to download, boot, and render a few frames.
   await page.waitForTimeout(15000);
 
-  await page.screenshot({ path: "/project/browser_screenshot.png" });
+  await page.screenshot({ path: "/project/browser_picker.png" });
 
-  // Interaction smoke test: click on the canvas (over the lower-48 landmass) to
-  // exercise the real Area2D input_event path. A clean run shows no new errors
-  // and the "Next" button becomes visible (an answer was resolved).
   const canvas = await page.$("canvas");
   if (canvas) {
     const box = await canvas.boundingBox();
     const cx = (fx, fy) => page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    // Picker is up. Click the first pack button ("United States", ~0.55 height).
+    await cx(0.5, 0.546);
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: "/project/browser_states.png" });
-    // Click several states across the map with >1s pauses. One will be the prompt;
-    // auto-advance should then move to a new prompt on its own (no further click).
-    const pts = [[0.46, 0.68], [0.3, 0.3], [0.65, 0.4], [0.5, 0.55], [0.8, 0.3]];
-    for (const [fx, fy] of pts) {
-      await cx(fx, fy);
-      await page.waitForTimeout(1400);
-    }
+    // Return to the picker via the bottom-right Menu button.
+    await cx(0.95, 0.955);
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: "/project/browser_menu.png" });
+    // Now pick the second pack ("World — Continents", ~0.64 height).
+    await cx(0.5, 0.642);
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: "/project/browser_click.png" });
   }
 

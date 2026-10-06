@@ -35,3 +35,7 @@ browser_states.png.import
 # A global ~/.gitignore "build" pattern would drop pack build pipelines; keep them.
 !packs/*/pipeline/
 !packs/*/pipeline/**
+browser_menu.png
+browser_menu.png.import
+browser_picker.png
+browser_picker.png.import

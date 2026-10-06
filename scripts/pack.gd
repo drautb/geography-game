@@ -37,6 +37,21 @@ func group_color(group: String, enabled := true) -> Color:
     return Color(dim.r, dim.g, dim.b, 1.0)
 
 
+## Read the registry packs/index.json into an ordered list of {id, name}.
+static func list_packs() -> Array:
+    var out: Array = []
+    var text := FileAccess.get_file_as_string("res://packs/index.json")
+    if text.is_empty():
+        push_error("Pack: could not read packs/index.json")
+        return out
+    var data = JSON.parse_string(text)
+    if typeof(data) != TYPE_DICTIONARY or not data.has("packs"):
+        return out
+    for p in data["packs"]:
+        out.append({"id": String(p.get("id", "")), "name": String(p.get("name", ""))})
+    return out
+
+
 ## Load a pack from packs/<pack_id>/pack.json. Returns a Pack, or null on error.
 static func load_pack(pack_id: String):
     var base := "res://packs/%s" % pack_id

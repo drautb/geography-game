@@ -40,6 +40,13 @@ func _init(areas: Array, points: Array = []) -> void:
     EventBus.area_clicked.connect(_on_area_clicked)
 
 
+## Disconnect from EventBus so this manager can be freed (RefCounted won't be
+## released while a signal connection holds a reference to it).
+func dispose() -> void:
+    if EventBus.area_clicked.is_connected(_on_area_clicked):
+        EventBus.area_clicked.disconnect(_on_area_clicked)
+
+
 func set_mode(mode: int) -> void:
     _mode = mode
 

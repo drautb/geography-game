@@ -9,6 +9,7 @@ extends CanvasLayer
 signal mode_toggled(points_mode: bool)
 signal groups_changed(enabled: Dictionary)
 signal show_names_toggled(show: bool)
+signal menu_requested
 
 var pack
 
@@ -54,10 +55,27 @@ func _ready() -> void:
 
     _build_control_panel()
     _build_options_panel()
+    _build_menu_button()
 
     EventBus.round_advanced.connect(_on_round_advanced)
     EventBus.answer_resolved.connect(_on_answer_resolved)
     EventBus.game_over.connect(_on_game_over)
+
+
+## A small "Menu" button (bottom-right) to return to the pack picker.
+func _build_menu_button() -> void:
+    var button := Button.new()
+    button.text = "☰ Menu"
+    button.anchor_left = 1.0
+    button.anchor_right = 1.0
+    button.anchor_top = 1.0
+    button.anchor_bottom = 1.0
+    button.offset_left = -108
+    button.offset_right = -16
+    button.offset_top = -48
+    button.offset_bottom = -16
+    button.pressed.connect(func(): menu_requested.emit())
+    add_child(button)
 
 
 ## Top-left panel: mode radios (only when the pack has points) + group checkboxes

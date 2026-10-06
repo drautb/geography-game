@@ -9,13 +9,12 @@ const PackScript := preload("res://scripts/pack.gd")
 const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const GameManagerScript := preload("res://scripts/game_manager.gd")
 const GameUiScript := preload("res://scripts/game_ui.gd")
+const PackPickerScript := preload("res://scripts/pack_picker.gd")
 const DESIGN_SIZE := Vector2(1280, 720)
 const AUTO_ADVANCE_DELAY := 1.0
 
-## Which pack to play. (A pack picker will set this later; hardcoded for now.)
-const PACK_ID := "us-states"
-
 var _pack
+var _picker: CanvasLayer
 var _map_root: Node2D
 var _game
 var _ui: CanvasLayer
@@ -35,10 +34,60 @@ var _points_mode := false
 
 func _ready() -> void:
     RenderingServer.set_default_clear_color(Color(0.1, 0.12, 0.15))
+    # EventBus connections are made once and persist across pack loads; the
+    # handlers guard on _game/_ui so they are inert while the picker is shown.
+    EventBus.round_advanced.connect(_on_round_advanced)
+    EventBus.answer_resolved.connect(_on_answer_resolved)
+    _show_picker()
 
-    _pack = PackScript.load_pack(PACK_ID)
+
+## Show the start screen. Any running game is torn down first.
+func _show_picker() -> void:
+    _teardown_game()
+    _picker = PackPickerScript.new()
+    _picker.pack_chosen.connect(_on_pack_chosen)
+    add_child(_picker)
+
+
+func _on_pack_chosen(pack_id: String) -> void:
+    if _picker != null:
+        _picker.queue_free()
+        _picker = null
+    _load_pack(pack_id)
+
+
+## Remove all game nodes/state so a fresh pack (or the picker) starts clean.
+func _teardown_game() -> void:
+    if _game != null:
+        # Disconnect its EventBus handler, then drop the reference so it frees.
+        _game.dispose()
+        _game = null
+    if _map_root != null:
+        _map_root.queue_free()
+        _map_root = null
+    if _ui != null:
+        _ui.queue_free()
+        _ui = null
+    _pack = null
+    _pins = null
+    _labels = null
+    _name_labels = null
+    _name_by_code = {}
+    _group_by_code = {}
+    _capital_by_code = {}
+    _pin_pos = {}
+    _enabled_groups = {}
+    _last_answer_code = ""
+    _wrong_code = ""
+    _points_mode = false
+    _advance_token += 1  # invalidate any pending auto-advance timer
+
+
+func _load_pack(pack_id: String) -> void:
+    _pack = PackScript.load_pack(pack_id)
     if _pack == null:
-        push_error("main: failed to load pack '%s'" % PACK_ID)
+        push_error("main: failed to load pack '%s'" % pack_id)
+        _show_picker()
         return
 
     _map_root = Node2D.new()
@@ -55,17 +104,14 @@ func _ready() -> void:
         points = MapBuilderScript.load_point_list(_pack.points_path)
         for p in points:
             _capital_by_code[String(p["code"])] = String(p["capital"])
-        # Point pins share the areas' transform. Hidden until points mode is on.
         _pins = MapBuilderScript.build_points(_map_root, _pack.points_path, t)
         _pins.visible = false
         _pin_pos = _pins.get_meta("pin_positions", {})
 
-    # On-map feedback labels live above the map, below the UI.
     _labels = Node2D.new()
     _labels.name = "MapLabels"
     _map_root.add_child(_labels)
 
-    # Persistent area-name labels (optional, toggled via the UI).
     _name_labels = MapBuilderScript.build_name_labels(_map_root, _map_root, _pack)
     _name_labels.visible = false
 
@@ -75,9 +121,7 @@ func _ready() -> void:
     _ui.mode_toggled.connect(_on_mode_toggled)
     _ui.groups_changed.connect(_on_groups_changed)
     _ui.show_names_toggled.connect(_on_show_names_toggled)
-
-    EventBus.round_advanced.connect(_on_round_advanced)
-    EventBus.answer_resolved.connect(_on_answer_resolved)
+    _ui.menu_requested.connect(_show_picker)
 
     _game = GameManagerScript.new(areas, points)
     _game.start()
@@ -93,6 +137,8 @@ func _base_fill(code: String) -> Color:
 ## At game over, any left-click restarts. Rounds auto-advance after a delay, so
 ## clicks are not needed to continue mid-game.
 func _unhandled_input(event: InputEvent) -> void:
+    if _game == null:
+        return
     if event is InputEventMouseButton:
         var mb := event as InputEventMouseButton
         if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _game.is_awaiting_restart():
@@ -100,6 +146,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_round_advanced(code: String) -> void:
+    if _game == null or _ui == null:
+        return
     # A new round is live; invalidate any pending auto-advance timer.
     _advance_token += 1
     if _last_answer_code != "":
@@ -114,6 +162,8 @@ func _on_round_advanced(code: String) -> void:
 
 
 func _on_answer_resolved(clicked_code: String, correct: bool) -> void:
+    if _game == null or _ui == null:
+        return
     if correct:
         if _wrong_code != "" and _wrong_code != clicked_code:
             MapBuilderScript.set_fill(self, _wrong_code, _base_fill(_wrong_code))

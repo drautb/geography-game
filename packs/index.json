@@ -1,0 +1,6 @@
+{
+  "packs": [
+    { "id": "us-states", "name": "United States" },
+    { "id": "world-continents", "name": "World — Continents" }
+  ]
+}
