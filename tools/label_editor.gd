@@ -13,13 +13,18 @@ const PackScript := preload("res://scripts/pack.gd")
 const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const DESIGN_SIZE := Vector2(1280, 720)
 
+# Chip (draggable label) background colors by state.
+const CHIP_IDLE := Color(0.18, 0.21, 0.27, 0.72)
+const CHIP_HOVER := Color(0.28, 0.34, 0.42, 0.9)
+const CHIP_GRABBED := Color(0.95, 0.78, 0.35, 0.95)
+
 var _pack
 var _map_root: Node2D
 var _overlay: Node2D  # leader lines + draggable labels live here
 var _anchors := {}  # code -> centroid Vector2 (on-map area anchor)
-var _labels := {}  # code -> Label node
+var _labels := {}  # code -> chip (PanelContainer) node
 var _moved := {}  # code -> true once dragged (becomes a callout on save)
-var _dragging: Label = null
+var _dragging: Control = null
 var _drag_offset := Vector2.ZERO
 var _status: Label
 var _pack_dropdown: OptionButton
@@ -111,27 +116,62 @@ func _load_pack(pack_id: String) -> void:
     _set_status("%s — drag labels, then Save" % _pack.name)
 
 
-func _make_label(code: String, text: String, pos: Vector2) -> Label:
+## A draggable "chip": a rounded panel sized to the text, with the name label on
+## top. The chip's background changes on hover and while grabbed, cueing that it is
+## draggable. `pos` is the chip's visual center.
+func _make_label(code: String, text: String, pos: Vector2) -> Control:
+    var pad := Vector2(10, 4)
+    var text_size := Vector2(text.length() * 7.0, 16.0)
+    var chip := Panel.new()
+    chip.custom_minimum_size = text_size + pad * 2.0
+    chip.size = chip.custom_minimum_size
+    chip.mouse_filter = Control.MOUSE_FILTER_STOP
+    chip.set_meta("code", code)
+    _style_chip(chip, CHIP_IDLE)
+
     var label := Label.new()
     label.text = text
     label.add_theme_font_size_override("font_size", 13)
     label.add_theme_color_override("font_color", Color(1, 1, 1))
     label.add_theme_color_override("font_outline_color", Color(0.1, 0.12, 0.16))
-    label.add_theme_constant_override("outline_size", 5)
-    label.mouse_filter = Control.MOUSE_FILTER_STOP
-    label.set_meta("code", code)
-    _place_label(label, pos)
-    return label
+    label.add_theme_constant_override("outline_size", 4)
+    label.set_anchors_preset(Control.PRESET_FULL_RECT)
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    chip.add_child(label)
+
+    # Hover highlight (ignored while this chip is the one being dragged).
+    chip.mouse_entered.connect(func(): _hover(chip, true))
+    chip.mouse_exited.connect(func(): _hover(chip, false))
+
+    _place_label(chip, pos)
+    return chip
 
 
-## Position a label so `pos` is its visual center (matches the game's centering).
-func _place_label(label: Label, pos: Vector2) -> void:
-    label.position = pos - Vector2(label.text.length() * 3.3, 7)
-    label.set_meta("center", pos)
+func _style_chip(chip: Control, color: Color) -> void:
+    var sb := StyleBoxFlat.new()
+    sb.bg_color = color
+    sb.set_corner_radius_all(5)
+    sb.border_color = Color(0.6, 0.66, 0.74, 0.5)
+    sb.set_border_width_all(1)
+    chip.add_theme_stylebox_override("panel", sb)
 
 
-func _label_center(label: Label) -> Vector2:
-    return label.get_meta("center")
+func _hover(chip: Control, on: bool) -> void:
+    if chip == _dragging:
+        return
+    _style_chip(chip, CHIP_HOVER if on else CHIP_IDLE)
+
+
+## Position a chip so `pos` is its visual center, and record that center.
+func _place_label(chip: Control, pos: Vector2) -> void:
+    chip.position = pos - chip.size * 0.5
+    chip.set_meta("center", pos)
+
+
+func _label_center(chip: Control) -> Vector2:
+    return chip.get_meta("center")
 
 
 func _input(event: InputEvent) -> void:
@@ -142,6 +182,7 @@ func _input(event: InputEvent) -> void:
         if event.pressed:
             _try_grab(event.position)
         elif _dragging != null:
+            _style_chip(_dragging, CHIP_IDLE)
             _dragging = null
     elif event is InputEventMouseMotion and _dragging != null:
         var mm := event as InputEventMouseMotion
@@ -152,17 +193,20 @@ func _input(event: InputEvent) -> void:
 
 
 func _try_grab(mouse_pos: Vector2) -> void:
-    # Grab the topmost label whose rect contains the cursor.
+    # Grab the topmost chip whose rect contains the cursor.
     for code in _labels:
-        var label: Label = _labels[code]
-        var rect := Rect2(label.position, label.size)
+        var chip: Control = _labels[code]
+        var rect := Rect2(chip.position, chip.size)
         if rect.has_point(mouse_pos):
-            _dragging = label
-            _drag_offset = _label_center(label) - mouse_pos
+            _dragging = chip
+            _drag_offset = _label_center(chip) - mouse_pos
+            _style_chip(chip, CHIP_GRABBED)
             return
 
 
-## Draw a leader line from each MOVED area's centroid to its label.
+## Draw a leader line from each MOVED area's centroid to the nearest point on its
+## chip's box (matching the game's MapBuilder._draw_callout anchoring, so what you
+## tune here is what ships).
 func _redraw_leaders() -> void:
     for child in _overlay.get_children():
         if child is Line2D:
@@ -170,13 +214,21 @@ func _redraw_leaders() -> void:
     for code in _moved:
         if not _labels.has(code) or not _anchors.has(code):
             continue
+        var chip: Control = _labels[code]
+        var anchor: Vector2 = _anchors[code]
+        var attach := _nearest_point_on_box(chip.position, chip.position + chip.size, anchor)
         var line := Line2D.new()
-        line.points = PackedVector2Array([_anchors[code], _label_center(_labels[code])])
+        line.points = PackedVector2Array([anchor, attach])
         line.width = 1.0
         line.default_color = Color(0.7, 0.75, 0.82, 0.7)
         line.antialiased = true
         _overlay.add_child(line)
         _overlay.move_child(line, 0)  # keep lines under the labels
+
+
+## Point on the axis-aligned box [tl, br] nearest to p (clamped to the box).
+func _nearest_point_on_box(tl: Vector2, br: Vector2, p: Vector2) -> Vector2:
+    return Vector2(clampf(p.x, tl.x, br.x), clampf(p.y, tl.y, br.y))
 
 
 func _reset_moved() -> void:
