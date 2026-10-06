@@ -19,16 +19,25 @@ const CHIP_HOVER := Color(0.28, 0.34, 0.42, 0.9)
 const CHIP_GRABBED := Color(0.95, 0.78, 0.35, 0.95)
 
 var _pack
+var _world: Node2D  # holds map + overlay; scaled/translated for zoom/pan
 var _map_root: Node2D
 var _overlay: Node2D  # leader lines + draggable labels live here
-var _anchors := {}  # code -> centroid Vector2 (on-map area anchor)
-var _labels := {}  # code -> chip (PanelContainer) node
+var _anchors := {}  # code -> centroid Vector2 (on-map area anchor), world coords
+var _labels := {}  # code -> chip (Panel) node
 var _moved := {}  # code -> true once dragged (becomes a callout on save)
 var _dragging: Control = null
+var _hovered: Control = null
 var _drag_offset := Vector2.ZERO
+var _zoom := 1.0
+var _pan := Vector2.ZERO
+var _panning := false
+var _pan_last := Vector2.ZERO
 var _status: Label
 var _pack_dropdown: OptionButton
 var _pack_ids := []
+
+const MIN_ZOOM := 0.5
+const MAX_ZOOM := 8.0
 
 
 func _ready() -> void:
@@ -75,27 +84,31 @@ func _on_pack_selected(index: int) -> void:
 
 
 func _load_pack(pack_id: String) -> void:
-    # Clear any previous map/overlay.
-    if _map_root != null:
-        _map_root.queue_free()
-    if _overlay != null:
-        _overlay.queue_free()
+    # Clear any previous world (map + overlay).
+    if _world != null:
+        _world.queue_free()
     _anchors.clear()
     _labels.clear()
     _moved.clear()
     _dragging = null
+    _hovered = null
+    _zoom = 1.0
+    _pan = Vector2.ZERO
 
     _pack = PackScript.load_pack(pack_id)
     if _pack == null:
         _set_status("failed to load pack '%s'" % pack_id)
         return
 
+    # Everything that zooms/pans lives under _world.
+    _world = Node2D.new()
+    add_child(_world)
     _map_root = Node2D.new()
-    add_child(_map_root)
+    _world.add_child(_map_root)
     MapBuilderScript.build(_map_root, _pack, DESIGN_SIZE)
 
     _overlay = Node2D.new()
-    add_child(_overlay)
+    _world.add_child(_overlay)
 
     # One draggable label per area, started at its callout (if any) or centroid.
     for child in _map_root.get_children():
@@ -112,8 +125,21 @@ func _load_pack(pack_id: String) -> void:
         _labels[code] = _make_label(code, name_str, start)
         _overlay.add_child(_labels[code])
 
+    _apply_transform()
     _redraw_leaders()
-    _set_status("%s — drag labels, then Save" % _pack.name)
+    _set_status("%s — scroll=zoom, middle-drag=pan, drag labels, Ctrl+S=save" % _pack.name)
+
+
+## Apply the current zoom/pan to the world node.
+func _apply_transform() -> void:
+    if _world != null:
+        _world.scale = Vector2(_zoom, _zoom)
+        _world.position = _pan
+
+
+## Screen (viewport) point -> world point under the current zoom/pan.
+func _to_world(screen: Vector2) -> Vector2:
+    return (screen - _pan) / _zoom
 
 
 ## A draggable "chip": a rounded panel sized to the text, with the name label on
@@ -125,7 +151,7 @@ func _make_label(code: String, text: String, pos: Vector2) -> Control:
     var chip := Panel.new()
     chip.custom_minimum_size = text_size + pad * 2.0
     chip.size = chip.custom_minimum_size
-    chip.mouse_filter = Control.MOUSE_FILTER_STOP
+    chip.mouse_filter = Control.MOUSE_FILTER_IGNORE  # hit-testing is manual (world-space)
     chip.set_meta("code", code)
     _style_chip(chip, CHIP_IDLE)
 
@@ -141,10 +167,6 @@ func _make_label(code: String, text: String, pos: Vector2) -> Control:
     label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     chip.add_child(label)
 
-    # Hover highlight (ignored while this chip is the one being dragged).
-    chip.mouse_entered.connect(func(): _hover(chip, true))
-    chip.mouse_exited.connect(func(): _hover(chip, false))
-
     _place_label(chip, pos)
     return chip
 
@@ -158,12 +180,6 @@ func _style_chip(chip: Control, color: Color) -> void:
     chip.add_theme_stylebox_override("panel", sb)
 
 
-func _hover(chip: Control, on: bool) -> void:
-    if chip == _dragging:
-        return
-    _style_chip(chip, CHIP_HOVER if on else CHIP_IDLE)
-
-
 ## Position a chip so `pos` is its visual center, and record that center.
 func _place_label(chip: Control, pos: Vector2) -> void:
     chip.position = pos - chip.size * 0.5
@@ -174,34 +190,95 @@ func _label_center(chip: Control) -> Vector2:
     return chip.get_meta("center")
 
 
+func _hover_chip(chip: Control, on: bool) -> void:
+    if chip == _dragging:
+        return
+    _style_chip(chip, CHIP_HOVER if on else CHIP_IDLE)
+
+
 func _input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and event.keycode == KEY_S and event.ctrl_pressed:
         _save()
         return
-    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-        if event.pressed:
-            _try_grab(event.position)
-        elif _dragging != null:
-            _style_chip(_dragging, CHIP_IDLE)
-            _dragging = null
-    elif event is InputEventMouseMotion and _dragging != null:
+
+    if event is InputEventMouseButton:
+        var mb := event as InputEventMouseButton
+        # Scroll wheel: zoom centered on the cursor.
+        if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
+            _zoom_at(mb.position, 1.1)
+            return
+        if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
+            _zoom_at(mb.position, 1.0 / 1.1)
+            return
+        # Middle button: pan.
+        if mb.button_index == MOUSE_BUTTON_MIDDLE:
+            _panning = mb.pressed
+            _pan_last = mb.position
+            return
+        # Left button: grab / release a chip.
+        if mb.button_index == MOUSE_BUTTON_LEFT:
+            if mb.pressed:
+                _try_grab(_to_world(mb.position))
+            elif _dragging != null:
+                _style_chip(_dragging, CHIP_IDLE)
+                _dragging = null
+        return
+
+    if event is InputEventMouseMotion:
         var mm := event as InputEventMouseMotion
-        var center: Vector2 = mm.position + _drag_offset
-        _place_label(_dragging, center)
-        _moved[String(_dragging.get_meta("code"))] = true
-        _redraw_leaders()
+        if _panning:
+            _pan += mm.position - _pan_last
+            _pan_last = mm.position
+            _apply_transform()
+            return
+        var world := _to_world(mm.position)
+        if _dragging != null:
+            _place_label(_dragging, world + _drag_offset)
+            _moved[String(_dragging.get_meta("code"))] = true
+            _redraw_leaders()
+        else:
+            _update_hover(world)
 
 
-func _try_grab(mouse_pos: Vector2) -> void:
-    # Grab the topmost chip whose rect contains the cursor.
+## Zoom by `factor` keeping the world point under `screen` fixed (cursor-centered).
+func _zoom_at(screen: Vector2, factor: float) -> void:
+    var new_zoom := clampf(_zoom * factor, MIN_ZOOM, MAX_ZOOM)
+    if is_equal_approx(new_zoom, _zoom):
+        return
+    var world_before := _to_world(screen)
+    _zoom = new_zoom
+    # Keep world_before under the same screen point: screen = world*zoom + pan.
+    _pan = screen - world_before * _zoom
+    _apply_transform()
+
+
+## Manual hover (chips are mouse-ignoring, so we hit-test in world coords).
+func _update_hover(world: Vector2) -> void:
+    var hit: Control = _chip_at(world)
+    if hit == _hovered:
+        return
+    if _hovered != null:
+        _hover_chip(_hovered, false)
+    _hovered = hit
+    if _hovered != null:
+        _hover_chip(_hovered, true)
+
+
+func _chip_at(world: Vector2) -> Control:
+    # Topmost chip whose world-space rect contains the point.
     for code in _labels:
         var chip: Control = _labels[code]
-        var rect := Rect2(chip.position, chip.size)
-        if rect.has_point(mouse_pos):
-            _dragging = chip
-            _drag_offset = _label_center(chip) - mouse_pos
-            _style_chip(chip, CHIP_GRABBED)
-            return
+        if Rect2(chip.position, chip.size).has_point(world):
+            return chip
+    return null
+
+
+func _try_grab(world: Vector2) -> void:
+    var chip := _chip_at(world)
+    if chip != null:
+        _dragging = chip
+        _drag_offset = _label_center(chip) - world
+        _style_chip(chip, CHIP_GRABBED)
 
 
 ## Draw a leader line from each MOVED area's centroid to the nearest point on its

@@ -48,7 +48,9 @@ Run it in the Godot editor (open the scene and play it) or via CLI:
 ```
 
 Pick a pack from the top-left dropdown, drag the crowded labels apart, then click
-**Save callouts** (or Ctrl+S). Save writes the moved labels into that pack's
+**Save callouts** (or Ctrl+S). Zoom with the scroll wheel (centered on the cursor)
+and pan by middle-mouse dragging, to work precisely inside tight clusters. Save writes
+the moved labels into that pack's
 `pack.json` `"callouts"` block (preserving every other field), so a later WASM rebuild
 picks them up automatically. **Reset dragged** returns all labels to auto position.
 Requires a real display — run on a desktop Godot, not the headless Docker setup.

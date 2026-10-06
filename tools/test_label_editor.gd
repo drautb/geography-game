@@ -24,13 +24,27 @@ func _process(_delta: float) -> void:
     if _frames == 8:
         var n_labels: int = _editor._labels.size()
         print("labels built: %d" % n_labels)
-        # Simulate dragging Chile's label to a new spot.
+        # Zoom in and pan, then simulate a drag using the SAME screen->world path the
+        # input handler uses, to confirm the saved callout is correct design-space.
+        _editor._zoom = 3.0
+        _editor._pan = Vector2(-500, -300)
+        _editor._apply_transform()
         var lbl = _editor._labels.get("CHL")
         if lbl != null:
-            _editor._place_label(lbl, Vector2(300, 400))
+            # Grab at the chip's current world center (projected to screen), then
+            # move the cursor so the chip's world center lands at (300,400).
+            var screen_grab: Vector2 = _editor._label_center(lbl) * _editor._zoom + _editor._pan
+            _editor._try_grab(_editor._to_world(screen_grab))
+            var screen_target: Vector2 = Vector2(300, 400) * _editor._zoom + _editor._pan
+            _editor._place_label(lbl, _editor._to_world(screen_target) + _editor._drag_offset)
             _editor._moved["CHL"] = true
             _editor._redraw_leaders()
-            print("moved CHL to (300,400); leader lines: %d" % _count_lines())
+            print(
+                (
+                    "zoom=%.1f; moved CHL -> world %s; leader lines: %d"
+                    % [_editor._zoom, str(_editor._label_center(lbl)), _count_lines()]
+                )
+            )
         _editor._save()
     if _frames == 12:
         # Read back the manifest and check.
