@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "name": "Africa",
+  "areas": "areas.geojson",
+  "points": "points.geojson",
+
+  "area_noun": "Country",
+  "point_noun": "Capital",
+
+  "left_inset": 120
+}

@@ -184,8 +184,10 @@ func _section_title(text: String) -> Label:
     return label
 
 
-## Naive English plural for a mode noun ("State" -> "States").
+## English plural for a mode noun: "State" -> "States", "Country" -> "Countries".
 func _plural(noun: String) -> String:
+    if noun.ends_with("y") and noun.length() > 1 and not "aeiou".contains(noun[-2].to_lower()):
+        return noun.substr(0, noun.length() - 1) + "ies"
     return noun + "s"
 
 

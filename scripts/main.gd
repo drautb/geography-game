@@ -127,11 +127,12 @@ func _load_pack(pack_id: String) -> void:
     _game.start()
 
 
-## An area's base fill: its group color, dimmed if the group is disabled.
+## An area's base fill: its distinct/group color, dimmed if its group is disabled.
 func _base_fill(code: String) -> Color:
-    var group := String(_group_by_code.get(code, ""))
-    var on: bool = _enabled_groups.is_empty() or _enabled_groups.get(group, false)
-    return _pack.group_color(group, on)
+    var area := _map_root.get_node_or_null(NodePath(code))
+    if area == null:
+        return MapBuilderScript.FILL_CORRECT  # unreachable in practice
+    return MapBuilderScript.area_base_fill(area, _pack, _enabled_groups)
 
 
 ## At game over, any left-click restarts. Rounds auto-advance after a delay, so

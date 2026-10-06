@@ -1,6 +1,24 @@
 {
   "packs": [
-    { "id": "us-states", "name": "United States" },
-    { "id": "world-continents", "name": "World — Continents" }
+    {
+      "id": "us-states",
+      "name": "United States"
+    },
+    {
+      "id": "world-continents",
+      "name": "World — Continents"
+    },
+    {
+      "id": "south-america",
+      "name": "South America"
+    },
+    {
+      "id": "africa",
+      "name": "Africa"
+    },
+    {
+      "id": "europe",
+      "name": "Europe"
+    }
   ]
 }

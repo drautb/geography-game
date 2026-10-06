@@ -38,11 +38,19 @@ static func set_fill(root: Node, code: String, color: Color) -> void:
 ## group is not enabled. `enabled_groups` is a {group: true} set; empty means all.
 static func apply_group_colors(map_root: Node, pack, enabled_groups: Dictionary) -> void:
     for child in map_root.get_children():
-        if not (child is Area2D) or not child.has_meta("group"):
+        if not (child is Area2D) or not child.has_meta("base_color"):
             continue
-        var group := String(child.get_meta("group"))
-        var on: bool = enabled_groups.is_empty() or enabled_groups.get(group, false)
-        set_fill(map_root, String(child.name), pack.group_color(group, on))
+        set_fill(map_root, String(child.name), area_base_fill(child, pack, enabled_groups))
+
+
+## The base fill for one area's Area2D: its stored distinct color (ungrouped pack)
+## or its group color, dimmed when that group is disabled.
+static func area_base_fill(area: Area2D, pack, enabled_groups: Dictionary) -> Color:
+    if not pack.has_groups():
+        return area.get_meta("base_color")
+    var group := String(area.get_meta("group"))
+    var on: bool = enabled_groups.is_empty() or enabled_groups.get(group, false)
+    return pack.group_color(group, on)
 
 
 ## Read the list of {code, name, group} for every feature in an areas GeoJSON.
@@ -284,6 +292,7 @@ static func build(parent: Node2D, pack, target_size: Vector2, padding := 40.0) -
     var features: Array = data["features"]
     var t := _compute_transform(features, target_size, padding, pack.left_inset)
 
+    var index := 0
     for feature in features:
         var geom = feature.get("geometry")
         if geom == null:
@@ -293,7 +302,8 @@ static func build(parent: Node2D, pack, target_size: Vector2, padding := 40.0) -
         # under the area fill so the polygon sits on top of the line's end.
         if props.has("origin") and props.has("callout"):
             _build_leader(parent, props["origin"], props["callout"], t)
-        _build_area(parent, geom, props, t, pack)
+        _build_area(parent, geom, props, t, pack, index)
+        index += 1
     return t
 
 
@@ -316,7 +326,7 @@ static func _build_leader(parent: Node2D, origin: Array, callout: Array, t: Tran
 
 
 static func _build_area(
-    parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform, pack
+    parent: Node2D, geom: Dictionary, props: Dictionary, t: Transform, pack, index: int
 ) -> void:
     var code := String(props.get("code", "??"))
     var group := String(props.get("group", ""))
@@ -328,7 +338,11 @@ static func _build_area(
     area.input_pickable = true
     area.input_event.connect(_on_area_input.bind(code))
 
-    var base_color: Color = pack.group_color(group, true)
+    # Grouped packs color by group; ungrouped packs give each area a distinct color.
+    var base_color: Color = (
+        pack.group_color(group, true) if pack.has_groups() else pack.distinct_color(index)
+    )
+    area.set_meta("base_color", base_color)
     var best_anchor := Vector2.ZERO
     var best_area := -1.0
 

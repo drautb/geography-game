@@ -33,8 +33,20 @@ func group_color(group: String, enabled := true) -> Color:
     var c: Color = group_colors.get(group, DEFAULT_FILL)
     if enabled:
         return c
-    var dim := c.lerp(Color(0.16, 0.19, 0.24), 0.68)
-    return Color(dim.r, dim.g, dim.b, 1.0)
+    return _dim(c)
+
+
+## A distinct color for the Nth area in an ungrouped pack, spread around the hue
+## wheel by the golden angle so adjacent areas differ. Pleasant mid saturation/value.
+func distinct_color(index: int) -> Color:
+    var hue := fmod(index * 0.61803398875, 1.0)
+    return Color.from_hsv(hue, 0.42, 0.72)
+
+
+## Dim a color toward the dark background (for a disabled group).
+func _dim(c: Color) -> Color:
+    var d := c.lerp(Color(0.16, 0.19, 0.24), 0.68)
+    return Color(d.r, d.g, d.b, 1.0)
 
 
 ## Read the registry packs/index.json into an ordered list of {id, name}.
