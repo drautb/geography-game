@@ -11,7 +11,8 @@ class_name MapBuilder
 ##   Area2D (named by code, holds "code"/"name"/"group"/"label_pos" metadata)
 ##   ├── Polygon2D       (fill, one per geometry part)
 ##   ├── Line2D          (border outline, one per ring)
-##   └── CollisionPolygon2D (hit region, one per geometry part)
+##   ├── CollisionPolygon2D (hit region, one per geometry part)
+##   └── CollisionShape2D   (supplementary circular hit zone, tiny areas only)
 
 const FILL_CORRECT := Color(0.36, 0.72, 0.42)
 const FILL_WRONG := Color(0.82, 0.36, 0.33)
@@ -27,6 +28,12 @@ const FILL_GROUP_PREFIX := "fill_"
 
 ## Design width used to keep callout labels on screen.
 const DESIGN_WIDTH := 1280.0
+
+## Minimum clickable radius (screen px) for a tiny area. An area whose largest
+## part is smaller than a disc of this radius gets a supplementary circular hit
+## zone centered on its anchor, so sub-pixel islands/atolls stay clickable. The
+## visible polygon is unchanged; this only enlarges the Area2D's hit region.
+const MIN_HIT_RADIUS := 14.0
 
 
 ## Recolor every fill polygon belonging to `code` within `root`'s tree.
@@ -387,6 +394,23 @@ static func _build_area(
             area.add_child(line)
 
     area.set_meta("label_pos", best_anchor)
+
+    # Tiny areas (atolls, micro-states) can shrink to a sub-pixel polygon that is
+    # effectively unclickable. If the largest part is smaller than a disc of
+    # MIN_HIT_RADIUS, add a circular hit zone of that radius on the anchor. Give
+    # smaller areas a higher pick priority so an enlarged circle that overlaps a
+    # big neighbor still resolves to the small area the player is aiming at.
+    if best_area >= 0.0:
+        var min_disc := PI * MIN_HIT_RADIUS * MIN_HIT_RADIUS
+        if best_area < min_disc:
+            var circle := CircleShape2D.new()
+            circle.radius = MIN_HIT_RADIUS
+            var hit := CollisionShape2D.new()
+            hit.shape = circle
+            hit.position = best_anchor
+            area.add_child(hit)
+            area.priority = int(clampf(min_disc - best_area, 1.0, 1000.0))
+
     parent.add_child(area)
 
 
