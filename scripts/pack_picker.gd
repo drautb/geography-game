@@ -1,8 +1,9 @@
 extends CanvasLayer
 ## Start screen: a clickable world map. Hovering a continent highlights it and
 ## shows its name; clicking either launches that continent's pack directly or, for
-## a continent with sub-regions (North America), opens a small drill-down menu.
-## A plain button offers the whole-world "Continents" quiz. Emits pack_chosen(id).
+## a continent with sub-regions (North America), zooms into a sub-map with generous
+## circular hit zones. A plain button offers the whole-world "Continents" quiz.
+## Emits pack_chosen(id).
 
 signal pack_chosen(pack_id: String)
 
@@ -11,8 +12,8 @@ const MapBuilderScript := preload("res://scripts/map_builder.gd")
 const DESIGN_SIZE := Vector2(1280, 720)
 
 ## Which world-continents area code maps to which pack(s). A single id launches
-## directly; a list opens a drill-down menu (label/id pairs). Continents absent
-## here (Antarctica) are shown but inert.
+## directly; a dict with a "zoom" entry opens a zoomed-in sub-map with generous
+## clickable hit zones. Continents absent here (Antarctica) are shown but inert.
 const CONTINENT_PACKS := {
     "AF": "africa",
     "AS": "asia",
@@ -20,11 +21,25 @@ const CONTINENT_PACKS := {
     "SA": "south-america",
     "OC": "oceania",
     "NA":
-    [
-        {"name": "North America", "id": "north-america"},
-        {"name": "United States", "id": "us-states"},
-        {"name": "Caribbean", "id": "caribbean"},
-    ],
+    {
+        "zoom": "north-america",  # pack whose map is the zoom-in backdrop
+        # Hit zones anchored to the backdrop's own areas (by code) so they track
+        # the map wherever it renders, with a pixel offset + generous radius.
+        # "Caribbean" has no drawn area here, so it uses an absolute center in the
+        # ocean east of Central America where the islands actually are.
+        "zones":
+        [
+            {"name": "United States", "id": "us-states", "anchor": "USA", "radius": 78},
+            {
+                "name": "North America",
+                "id": "north-america",
+                "anchor": "CAN",
+                "offset": [0, -20],
+                "radius": 82
+            },
+            {"name": "Caribbean", "id": "caribbean", "center": [965, 470], "radius": 86},
+        ],
+    },
 }
 
 const HOVER_COLOR := Color(0.95, 0.78, 0.35)
@@ -145,60 +160,142 @@ func _on_area_input(_vp: Node, event: InputEvent, _idx: int, code: String) -> vo
             _choose(code)
 
 
-## Launch directly for a single-pack continent, or open a drill-down menu for a
+## Launch directly for a single-pack continent, or open a zoomed sub-map for a
 ## continent that maps to several packs.
 func _choose(code: String) -> void:
     var target = CONTINENT_PACKS[code]
     if target is String:
         pack_chosen.emit(target)
-    elif target is Array:
-        _open_drill(String(_name_by_code.get(code, code)), target)
+    elif target is Dictionary and target.has("zoom"):
+        _open_zoom(String(_name_by_code.get(code, code)), target)
 
 
-func _open_drill(continent_name: String, options: Array) -> void:
+## Zoom into a continent: show its backdrop map full-bleed with generous circular
+## hit zones for each sub-pack. Hovering a zone highlights it and shows its name;
+## clicking launches that pack. The awkward targets (US over the continent, the
+## offshore Caribbean) get big discs so they are easy to hit.
+func _open_zoom(continent_name: String, spec: Dictionary) -> void:
     _hover_label.visible = false
-    var veil := ColorRect.new()
-    veil.color = Color(0.0, 0.0, 0.0, 0.55)
+    var veil := Control.new()
     veil.set_anchors_preset(Control.PRESET_FULL_RECT)
-    # Clicking the dark veil (outside the menu) cancels the drill-down.
-    veil.gui_input.connect(
-        func(e: InputEvent):
-            if e is InputEventMouseButton and (e as InputEventMouseButton).pressed:
-                _close_drill()
-    )
     add_child(veil)
     _drill = veil
 
-    var center := CenterContainer.new()
-    center.set_anchors_preset(Control.PRESET_FULL_RECT)
-    center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    veil.add_child(center)
+    var bg := ColorRect.new()
+    bg.color = Color(0.1, 0.12, 0.15)
+    bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+    bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    veil.add_child(bg)
 
-    var col := VBoxContainer.new()
-    col.add_theme_constant_override("separation", 12)
-    center.add_child(col)
+    var top_band := 118.0
+    var bottom_band := 76.0
+
+    # Backdrop: the continent's own pack map, dimmed so the hit discs read on top.
+    var zoom_root := Node2D.new()
+    veil.add_child(zoom_root)
+    var anchor_pos := {}  # area code -> screen-space center of that area
+    var pack = PackScript.load_pack(String(spec["zoom"]))
+    if pack != null:
+        var map_h := DESIGN_SIZE.y - top_band - bottom_band
+        MapBuilderScript.build(zoom_root, pack, Vector2(DESIGN_SIZE.x, map_h), 24.0)
+        zoom_root.position.y = top_band
+        var i := 0
+        for a in zoom_root.get_children():
+            if a is Area2D:
+                a.input_pickable = false  # the discs own the clicks, not the map
+                MapBuilderScript.set_fill(zoom_root, String(a.name), pack.distinct_color(i))
+                i += 1
+                var lp: Vector2 = a.get_meta("label_pos")
+                anchor_pos[String(a.name)] = lp + zoom_root.position
 
     var heading := Label.new()
     heading.text = continent_name
-    heading.add_theme_font_size_override("font_size", 26)
+    heading.add_theme_font_size_override("font_size", 28)
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    col.add_child(heading)
+    heading.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    heading.offset_top = 16
+    heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    veil.add_child(heading)
 
-    for opt in options:
-        var id := String(opt["id"])
-        var button := Button.new()
-        button.text = String(opt["name"])
-        button.add_theme_font_size_override("font_size", 20)
-        button.custom_minimum_size = Vector2(300, 48)
-        button.pressed.connect(func(): pack_chosen.emit(id))
-        col.add_child(button)
+    var hint := Label.new()
+    hint.text = "Click a region — or Back"
+    hint.add_theme_font_size_override("font_size", 16)
+    hint.add_theme_color_override("font_color", Color(0.72, 0.78, 0.86))
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    hint.offset_top = 56
+    hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    veil.add_child(hint)
 
-    var cancel := Button.new()
-    cancel.text = "Back"
-    cancel.add_theme_font_size_override("font_size", 16)
-    cancel.custom_minimum_size = Vector2(300, 36)
-    cancel.pressed.connect(_close_drill)
-    col.add_child(cancel)
+    # Generous circular hit zones. Each is an Area2D (circle) carrying a visible
+    # translucent disc and a label; hover brightens the disc. A zone's center
+    # comes from its anchor area on the backdrop (so it tracks the map) plus an
+    # optional offset, or from an absolute center when it anchors to no area.
+    var zone_layer := Node2D.new()
+    veil.add_child(zone_layer)
+    for z in spec["zones"]:
+        var c: Vector2
+        if z.has("anchor") and anchor_pos.has(String(z["anchor"])):
+            c = anchor_pos[String(z["anchor"])]
+        else:
+            var ctr: Array = z["center"]
+            c = Vector2(float(ctr[0]), float(ctr[1]))
+        if z.has("offset"):
+            var off: Array = z["offset"]
+            c += Vector2(float(off[0]), float(off[1]))
+        _add_zone(zone_layer, String(z["name"]), String(z["id"]), c, float(z["radius"]))
+
+    var back := Button.new()
+    back.text = "Back"
+    back.add_theme_font_size_override("font_size", 18)
+    back.custom_minimum_size = Vector2(160, 44)
+    back.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+    back.offset_left = -80
+    back.offset_top = -58
+    back.pressed.connect(_close_drill)
+    veil.add_child(back)
+
+
+## One generous circular hit zone: a translucent disc (Polygon2D), a centered
+## label, and an Area2D+CircleShape2D for clicks. Hover brightens the disc.
+func _add_zone(parent: Node2D, zone_name: String, id: String, c: Vector2, radius: float) -> void:
+    var disc := Polygon2D.new()
+    var ring := PackedVector2Array()
+    for k in 32:
+        var ang := TAU * float(k) / 32.0
+        ring.append(c + Vector2(cos(ang), sin(ang)) * radius)
+    disc.polygon = ring
+    var rest := Color(0.95, 0.78, 0.35, 0.22)
+    var hot := Color(0.95, 0.78, 0.35, 0.5)
+    disc.color = rest
+    parent.add_child(disc)
+
+    var label := Label.new()
+    label.text = zone_name
+    label.add_theme_font_size_override("font_size", 20)
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.size = Vector2(radius * 2.0, 26)
+    label.position = c - Vector2(radius, 13)
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    parent.add_child(label)
+
+    var area := Area2D.new()
+    area.position = c
+    var shape := CollisionShape2D.new()
+    var circle := CircleShape2D.new()
+    circle.radius = radius
+    shape.shape = circle
+    area.add_child(shape)
+    area.mouse_entered.connect(func(): disc.color = hot)
+    area.mouse_exited.connect(func(): disc.color = rest)
+    area.input_event.connect(
+        func(_vp: Node, e: InputEvent, _i: int):
+            if e is InputEventMouseButton:
+                var mb := e as InputEventMouseButton
+                if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+                    pack_chosen.emit(id)
+    )
+    parent.add_child(area)
 
 
 func _close_drill() -> void:
