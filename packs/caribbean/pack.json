@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "Caribbean",
+  "areas": "areas.geojson",
+  "points": "points.geojson",
+  "area_noun": "Country",
+  "point_noun": "Capital",
+  "left_inset": 120,
+  "callouts": {
+    "KNA": [
+      1120,
+      250
+    ],
+    "ATG": [
+      1120,
+      295
+    ],
+    "DMA": [
+      1120,
+      345
+    ],
+    "LCA": [
+      1120,
+      395
+    ],
+    "VCT": [
+      1120,
+      440
+    ],
+    "BRB": [
+      1240,
+      440
+    ],
+    "GRD": [
+      1120,
+      490
+    ],
+    "TTO": [
+      1120,
+      560
+    ]
+  }
+}
