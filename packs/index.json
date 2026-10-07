@@ -31,6 +31,10 @@
     {
       "id": "caribbean",
       "name": "Caribbean"
+    },
+    {
+      "id": "oceania",
+      "name": "Oceania"
     }
   ]
 }
