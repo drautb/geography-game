@@ -178,6 +178,11 @@ func _open_zoom(continent_name: String, spec: Dictionary) -> void:
     _hover_label.visible = false
     var veil := Control.new()
     veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+    # A full-rect Control defaults to MOUSE_FILTER_STOP, which would sit in front
+    # of the Area2D hit zones and swallow every click before picking reaches them.
+    # Make it transparent to the mouse so clicks fall through to the zones; the
+    # Back button is a child Control with its own filter, so it still works.
+    veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(veil)
     _drill = veil
 
