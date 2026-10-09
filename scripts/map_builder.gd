@@ -400,9 +400,11 @@ static func _build_area(
     # MIN_HIT_RADIUS, add a circular hit zone of that radius on the anchor. Give
     # smaller areas a higher pick priority so an enlarged circle that overlaps a
     # big neighbor still resolves to the small area the player is aiming at.
+    var is_tiny := false
     if best_area >= 0.0:
         var min_disc := PI * MIN_HIT_RADIUS * MIN_HIT_RADIUS
         if best_area < min_disc:
+            is_tiny = true
             var circle := CircleShape2D.new()
             circle.radius = MIN_HIT_RADIUS
             var hit := CollisionShape2D.new()
@@ -411,7 +413,34 @@ static func _build_area(
             area.add_child(hit)
             area.priority = int(clampf(min_disc - best_area, 1.0, 1000.0))
 
+    # Hover affordance for tiny island nations: a ring at the anchor that shows
+    # while the cursor is over the area, so the player can tell a click will
+    # register even though the polygon is a sub-pixel dot. Normal-sized areas are
+    # already obviously clickable and get no ring (a ring centered in a big
+    # country would look wrong), and the game's answer coloring is left untouched.
+    if is_tiny:
+        _add_hover_ring(area, best_anchor, MIN_HIT_RADIUS)
+
     parent.add_child(area)
+
+
+## A hidden ring at `center`; shown on hover so a clickable area is obvious even
+## when its polygon is a sub-pixel dot. Toggled via the area's mouse_entered /
+## mouse_exited so it works for any pack without per-pack wiring.
+static func _add_hover_ring(area: Area2D, center: Vector2, radius: float) -> void:
+    var ring := Line2D.new()
+    var pts := PackedVector2Array()
+    for k in 25:
+        var ang := TAU * float(k) / 24.0
+        pts.append(center + Vector2(cos(ang), sin(ang)) * radius)
+    ring.points = pts
+    ring.width = 2.5
+    ring.default_color = FILL_HIGHLIGHT
+    ring.antialiased = true
+    ring.visible = false
+    area.add_child(ring)
+    area.mouse_entered.connect(func(): ring.visible = true)
+    area.mouse_exited.connect(func(): ring.visible = false)
 
 
 ## Shoelace area (absolute) of a screen-space ring, for picking the largest part.
